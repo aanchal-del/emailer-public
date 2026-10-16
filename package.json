@@ -1,0 +1,8 @@
+{
+  "name": "emailer-studio",
+  "private": true,
+  "description": "Mailer compliance workspace. Static site + one Netlify Function for shared storage.",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.4"
+  }
+}

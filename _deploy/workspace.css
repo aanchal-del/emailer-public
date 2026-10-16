@@ -377,3 +377,4 @@ select { font: inherit; font-size: 13.5px; padding: 7px 9px; border: 1px solid #
   .mailer-body { display: block; }
 }
 .req-add .link { font-size: 13px; }
+.ai-badge.store { background: var(--pass-bg); color: var(--pass); border-color: #bfe3d1; }

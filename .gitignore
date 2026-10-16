@@ -20,3 +20,7 @@ emailer-site.zip
 _old_attempts/
 .claude/
 .DS_Store
+
+# Shared workspace data when running locally
+data/
+node_modules/

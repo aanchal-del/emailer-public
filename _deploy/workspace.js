@@ -113,12 +113,19 @@
   }
 
   /* ---------- data ---------- */
+  // The shared-store version each view was loaded at; polling compares against it.
+  let seen = { key: null, v: null };
+  const markSeen = async (pid) => { if (DB.mode === "shared") seen = { key: pid || "_all", v: await DB.version(pid).catch(() => null) }; };
+
   async function loadAll() {
+    await markSeen(null);
     S.projects = (await DB.all("projects")).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const [mailers, briefs, reviews, events] = await Promise.all(["mailers", "briefs", "reviews", "events"].map((s) => DB.all(s)));
-    S.all = { mailers, briefs, reviews, events };
+    // Every project's history would be a lot to fetch for a dashboard; counts are enough.
+    const [mailers, briefs, reviews] = await Promise.all(["mailers", "briefs", "reviews"].map((s) => DB.all(s)));
+    S.all = { mailers, briefs, reviews };
   }
   async function reloadProject(pid) {
+    await markSeen(pid);
     S.project = await DB.get("projects", pid);
     const [m, b, r, e] = await Promise.all(["mailers", "briefs", "reviews", "events"].map((s) => DB.where(s, "projectId", pid)));
     S.mailers = m.sort((a, z) => z.createdAt.localeCompare(a.createdAt));
@@ -214,7 +221,6 @@
     crumbs([{ label: "Projects" }]);
     const count = (store, pid, fn) => S.all[store].filter((x) => x.projectId === pid && (!fn || fn(x))).length;
     const cards = S.projects.map((p) => {
-      const last = S.all.events.filter((e) => e.projectId === p.id).sort((a, z) => z.at.localeCompare(a.at))[0];
       return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/upload" tabindex="0">
         <div class="pc-top"><h3>${esc(p.name)}</h3>
           <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">🗑</button></div>
@@ -224,7 +230,7 @@
           <div><b>${count("reviews", p.id, (r) => r.stage === "manual")}</b><span>Manual checks</span></div>
           <div><b>${count("mailers", p.id, (m) => m.final)}</b><span>Final approved</span></div>
         </div>
-        <div class="pc-foot">${last ? `Last: ${esc(last.text)} · ${fmtDate(last.at)}` : `Created ${fmtDay(p.createdAt)} by ${esc(p.createdBy || "—")}`}</div>
+        <div class="pc-foot">Created ${fmtDay(p.createdAt)} by ${esc(p.createdBy || "—")}</div>
       </article>`;
     }).join("");
     app.innerHTML = `<div class="dash">
@@ -986,10 +992,10 @@
       const p = S.projects.find((x) => x.id === el.dataset.id);
       if (!p || !await confirmModal(`Delete “${p.name}” with all its mailers, briefs, checks and files? This can't be undone.`, "Delete project", true)) return;
       for (const s of ["mailers", "briefs", "reviews", "events"]) {
-        for (const x of S.all[s].filter((y) => y.projectId === p.id)) {
-          if (s === "mailers") for (const v of x.versions) await DB.del("files", v.fileId);
-          if (s === "briefs" && x.fileId) await DB.del("files", x.fileId);
-          await DB.del(s, x.id);
+        for (const x of await DB.where(s, "projectId", p.id)) {
+          if (s === "mailers") for (const v of x.versions) await DB.delFile(v.fileId);
+          if (s === "briefs" && x.fileId) await DB.delFile(x.fileId);
+          await DB.del(s, x.id, p.id);
         }
       }
       await DB.del("projects", p.id);
@@ -999,9 +1005,9 @@
     "delete-mailer": async (el) => {
       const m = S.mailers.find((x) => x.id === el.dataset.id);
       if (!m || !await confirmModal(`Delete “${m.name}” (${m.versions.length} version(s)) and its checks? History entries are kept.`, "Delete mailer", true)) return;
-      for (const v of m.versions) { await DB.del("files", v.fileId); cache.delete(`${m.id}:${v.v}`); }
-      for (const r of S.reviews.filter((x) => x.mailerId === m.id)) await DB.del("reviews", r.id);
-      await DB.del("mailers", m.id);
+      for (const v of m.versions) { await DB.delFile(v.fileId); cache.delete(`${m.id}:${v.v}`); }
+      for (const r of S.reviews.filter((x) => x.mailerId === m.id)) await DB.del("reviews", r.id, m.projectId);
+      await DB.del("mailers", m.id, m.projectId);
       await logEvent({ type: "upload", text: `Deleted mailer “${m.name}”` });
       await reloadProject(S.project.id);
       go(P() + "/upload");
@@ -1023,8 +1029,8 @@
     "brief-delete": async () => {
       const b = selectedBrief();
       if (!await confirmModal(`Delete the brief “${b.title}”?`, "Delete brief", true)) return;
-      if (b.fileId) await DB.del("files", b.fileId);
-      await DB.del("briefs", b.id);
+      if (b.fileId) await DB.delFile(b.fileId);
+      await DB.del("briefs", b.id, b.projectId);
       await logEvent({ type: "brief", text: `Deleted brief “${b.title}”` });
       await reloadProject(S.project.id);
       go(P() + "/briefs");
@@ -1239,5 +1245,67 @@
          <p>To turn AI on: put a valid key in <code>.env</code> as <code>ANTHROPIC_API_KEY=…</code>, then run <code>./start.sh</code> and open the address it prints.</p>`
   }));
   E.aiStatus.then((s) => { S.ai = s; renderAIBadge(); if (S.loadedPid) render(); });
-  migrateOld().catch((err) => console.warn(err)).finally(render);
+
+  function renderStoreBadge() {
+    const b = $("#storeBadge");
+    const shared = DB.mode === "shared";
+    b.className = "ai-badge " + (shared ? "on store" : "off");
+    b.textContent = shared ? "👥 Shared" : "💻 This browser only";
+    b.title = shared ? "Everyone using this site sees the same projects" : "No shared storage here — projects are saved in this browser only";
+  }
+  $("#storeBadge").addEventListener("click", () => modal({
+    title: DB.mode === "shared" ? "Shared workspace" : "Saved in this browser only",
+    body: DB.mode === "shared"
+      ? "<p>Projects, mailers, briefs, checks and history are stored on the server, so everyone with the link sees and edits the same data. Changes made by others appear within about 15 seconds.</p><p class='muted'>Anyone with the link can see and change everything here.</p>"
+      : "<p>This copy of the site has no shared storage, so projects are kept in this browser and other people won't see them.</p><p>Open the shared site (Netlify, linked to GitHub) or run <code>./start.sh</code> to share data.</p>"
+  }));
+
+  // Projects made before sharing existed live in this browser; offer to copy them up once.
+  async function offerUpload() {
+    if (DB.mode !== "shared" || lsGet("studio-uploaded-local")) return;
+    let projects = [];
+    try { projects = await DB.local.all("projects"); } catch (_) { return; }
+    if (!projects.length) return lsSet("studio-uploaded-local", "1");
+    const go = await modal({
+      title: "Share the projects saved in this browser?",
+      body: `<p>This browser has ${projects.length} project(s) from before the workspace was shared: <b>${projects.map((p) => esc(p.name)).join(", ")}</b>.</p>
+        <p>Copy them to the shared workspace so everyone can see them?</p>`,
+      actions: [{ label: "Not now", value: null }, { label: "Don't ask again", value: "never" }, { label: "Copy to shared", primary: true, value: "yes" }]
+    });
+    if (go === "never") return lsSet("studio-uploaded-local", "1");
+    if (go !== "yes") return;
+    toast("Copying your projects to the shared workspace…");
+    try {
+      for (const s of ["projects", "mailers", "briefs", "reviews", "events"])
+        for (const rec of await DB.local.all(s)) {
+          if (s === "mailers") for (const v of rec.versions) { const f = await DB.local.file(v.fileId); if (f) await DB.saveFile(f, v.fileId); }
+          if (s === "briefs" && rec.fileId) { const f = await DB.local.file(rec.fileId); if (f) await DB.saveFile(f, rec.fileId); }
+          await DB.put(s, rec);
+        }
+      lsSet("studio-uploaded-local", "1");
+      toast(`${projects.length} project(s) are now shared`);
+      render();
+    } catch (err) { toast("Copy stopped: " + err.message, "err"); }
+  }
+
+  // Pick up teammates' changes: one tiny version read every 15 s, a reload only when it moved.
+  async function poll() {
+    if (document.hidden || DB.mode !== "shared" || !$("#modal").hidden) return;
+    if (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+    const pid = parseRoute().view === "project" ? parseRoute().pid : null;
+    if (seen.key !== (pid || "_all")) return;          // the view is still loading
+    let v;
+    try { v = await DB.version(pid); } catch (_) { return; }
+    if (v === seen.v) return;
+    if (pid) await reloadProject(pid);
+    render();
+  }
+
+  DB.ready.then(async () => {
+    renderStoreBadge();
+    if (DB.mode === "local") await migrateOld().catch((err) => console.warn(err));
+    await render();
+    offerUpload().catch((err) => console.warn(err));
+    setInterval(() => poll().catch(() => {}), 15000);
+  });
 })();

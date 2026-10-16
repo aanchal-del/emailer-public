@@ -2,4 +2,13 @@
 [build]
   command = "bash build.sh"
   publish = "_deploy"
+
+# Shared storage for projects, mailers, briefs, checks and files (Netlify Blobs).
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[build.environment]
+  NODE_VERSION = "22"
+
 # The root → workspace redirect lives in _deploy/_redirects (written by build.sh).

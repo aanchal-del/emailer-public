@@ -7,11 +7,15 @@ button just reports that the pass is unavailable.
 """
 import json
 import os
+import re
 import sys
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import List, Literal
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 MODEL = "claude-opus-5-5"
 MAX_PAGES = 8          # cost guard — pages beyond this are reported, not analysed
@@ -449,6 +453,27 @@ ROUTES = {"/api/brief": lambda b: brief_reframe(b) if b.get("action") == "refram
           "/api/brief-check": brief_check}
 
 
+"""Shared storage, mirroring netlify/functions/data.mjs, so everyone using this server
+sees the same projects. Records are JSON files under data/ (kept out of git)."""
+DATA = Path(__file__).with_name("data")
+STORES = {"projects", "mailers", "briefs", "reviews", "events"}
+SAFE_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+DATA_LOCK = threading.Lock()
+
+
+def _rec_path(store, rid, pid):
+    return DATA / "rec" / "projects" / f"{rid}.json" if store == "projects" \
+        else DATA / "rec" / store / pid / f"{rid}.json"
+
+
+def _bump(pid):
+    v = f"{time.time():.6f}"
+    for name in (pid or "_none", "_all"):
+        p = DATA / "ver" / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(v)
+
+
 class Handler(SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store, max-age=0")
@@ -469,8 +494,97 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path in ("/api/vision", "/api/status"):
             # Lets the page show or hide AI features without exposing the key.
-            return self._json(200, ai_status())
+            return self._json(200, {**ai_status(), "shared": True})
+        if self.path.startswith(("/api/data/", "/api/files/", "/api/version")):
+            return self._storage("GET")
         return super().do_GET()
+
+    def do_PUT(self):
+        return self._storage("PUT")
+
+    def do_DELETE(self):
+        return self._storage("DELETE")
+
+    def _storage(self, method):
+        url = urlparse(self.path)
+        parts = [unquote(p) for p in url.path.split("/") if p]
+        project = parse_qs(url.query).get("project", [None])[0]
+        kind = parts[1] if len(parts) > 1 else ""
+        if project and not SAFE_ID.match(project):
+            return self._json(400, {"error": "Bad project id"})
+        body = self.rfile.read(int(self.headers.get("Content-Length") or 0)) if method == "PUT" else b""
+        with DATA_LOCK:
+            if kind == "version":
+                p = DATA / "ver" / (project or "_all")
+                return self._json(200, {"v": p.read_text() if p.exists() else "0"})
+
+            if kind == "data":
+                store = parts[2] if len(parts) > 2 else ""
+                rid = parts[3] if len(parts) > 3 else None
+                if store not in STORES:
+                    return self._json(404, {"error": "Unknown store"})
+                if rid and not SAFE_ID.match(rid):
+                    return self._json(400, {"error": "Bad id"})
+                if method == "GET" and not rid:
+                    base = DATA / "rec" / store
+                    if store != "projects" and project:
+                        base = base / project
+                    files = base.rglob("*.json") if base.exists() else []
+                    return self._json(200, [json.loads(f.read_text()) for f in files])
+                if method == "GET":
+                    if store != "projects" and not project:
+                        return self._json(400, {"error": "project is required"})
+                    p = _rec_path(store, rid, project)
+                    return self._json(200, json.loads(p.read_text())) if p.exists() else self._json(404, {"error": "Not found"})
+                if method == "PUT":
+                    try:
+                        rec = json.loads(body)
+                    except Exception:
+                        return self._json(400, {"error": "Bad JSON"})
+                    pid = rid if store == "projects" else rec.get("projectId")
+                    if rec.get("id") != rid or not pid or not SAFE_ID.match(pid):
+                        return self._json(400, {"error": "Record id / projectId missing or mismatched"})
+                    p = _rec_path(store, rid, pid)
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(json.dumps(rec))
+                    _bump(pid)
+                    return self._json(200, {"ok": True})
+                if method == "DELETE":
+                    pid = rid if store == "projects" else project
+                    if not pid:
+                        return self._json(400, {"error": "project is required"})
+                    _rec_path(store, rid, pid).unlink(missing_ok=True)
+                    _bump(pid)
+                    return self._json(200, {"ok": True})
+
+            if kind == "files":
+                fid = parts[2] if len(parts) > 2 else ""
+                if not SAFE_ID.match(fid):
+                    return self._json(400, {"error": "Bad file id"})
+                blob, meta = DATA / "files" / fid, DATA / "files" / f"{fid}.meta.json"
+                if method == "GET":
+                    if not blob.exists():
+                        return self._json(404, {"error": "File not found"})
+                    m = json.loads(meta.read_text()) if meta.exists() else {}
+                    data = blob.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type", m.get("type") or "application/octet-stream")
+                    self.send_header("X-File-Name", quote(m.get("name") or fid))
+                    self.send_header("Content-Length", str(len(data)))
+                    self.end_headers()
+                    self.wfile.write(data)
+                    return
+                if method == "PUT":
+                    blob.parent.mkdir(parents=True, exist_ok=True)
+                    blob.write_bytes(body)
+                    meta.write_text(json.dumps({"name": unquote(self.headers.get("X-File-Name") or fid),
+                                                "type": self.headers.get("Content-Type") or "", "size": len(body)}))
+                    return self._json(200, {"ok": True})
+                if method == "DELETE":
+                    blob.unlink(missing_ok=True)
+                    meta.unlink(missing_ok=True)
+                    return self._json(200, {"ok": True})
+        return self._json(404, {"error": "not found"})
 
     def do_POST(self):
         if self.path != "/api/vision" and self.path not in ROUTES:
