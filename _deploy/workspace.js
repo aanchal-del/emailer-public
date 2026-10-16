@@ -396,6 +396,7 @@
     const r = { ...a.r, marks: a.r.marks.concat(a.brand.marks) };
     E.renderReport(r, a.file, $("#report"), { slot: true, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
     $("#report .report-slot").innerHTML = '<div id="checklist"></div>';
+    S.focusItem = null;
     refreshMailer();
   }
 
@@ -458,8 +459,8 @@
       const dec = d.decisions[i.id];
       const suggested = DECIDED.includes(i.status) ? i.status : null;
       const seg = ["pass", "fail", "na"].map((v) => `<button type="button" class="${dec === v ? "on " + v : ""}" data-dec="${v}" aria-pressed="${dec === v}">${{ pass: "✓ Pass", fail: "✕ Fail", na: "N/A" }[v]}</button>`).join("");
-      return `<tr data-item="${i.id}" class="${dec ? "" : "undecided"}">
-        <td><b>${esc(C.label(i.id))}</b><small>${esc(C.ITEMS.find((x) => x.id === i.id).cat)}</small></td>
+      return `<tr data-item="${i.id}" class="${dec ? "" : "undecided"}${S.focusItem === i.id ? " focus" : ""}">
+        <td class="cl-name" tabindex="0" title="Show on the preview"><b>${esc(C.label(i.id))}</b><small>${esc(C.ITEMS.find((x) => x.id === i.id).cat)}</small></td>
         <td>${badge(i.status)} ${meth(i)}<div class="ev">${esc(i.evidence)}</div>${i.aiNote ? `<div class="ev ai">✦ AI second opinion (${esc(i.aiStatus)}): ${esc(i.aiNote)}</div>` : ""}</td>
         <td><div class="seg">${seg}</div>${dec && suggested === dec && !d.touched[i.id] ? '<small class="pre">pre-filled</small>' : ""}</td>
       </tr>`;
@@ -472,7 +473,7 @@
     box.innerHTML = `<div class="card checklist">
       <div class="cl-head">
         <div><h3>Amex brand & copy checklist</h3>
-          <p class="muted small">Decided automatically where the PDF allows. Boxes for these checks are on the preview above.</p></div>
+          <p class="muted small">Decided automatically where the PDF allows. Click a check’s name to see it highlighted on the preview beside it.</p></div>
         <div class="cl-actions"><button class="btn ghost sm ai-btn" data-act="ai-brand" ${aiAttr()}>✦ AI-check the ${need} remaining</button>${aiNote()}</div>
       </div>
       <div class="cl-split">
@@ -496,6 +497,29 @@
       </div>
       ${prior ? `<h4 class="prior-h">Checks on this version</h4><ul class="prior">${prior}</ul>` : ""}
     </div>`;
+    applyFocus(false);
+  }
+
+  /* Click a checklist heading → dim the preview and light up just that check's boxes. */
+  function applyFocus(scroll) {
+    const pv = $("#preview"), id = S.focusItem;
+    if (!pv) return;
+    $$("#checklist tr.focus").forEach((tr) => tr.classList.remove("focus"));
+    $$(".pv-mark.focus", pv).forEach((el) => el.classList.remove("focus"));
+    const old = $("#pvFocus");
+    if (old) old.remove();
+    pv.classList.toggle("focusing", !!id);
+    if (!id) return;
+    const row = $(`#checklist tr[data-item="${id}"]`);
+    if (row) row.classList.add("focus");
+    const hits = $$(".pv-mark", pv).filter((el) => el.dataset.item === id);
+    hits.forEach((el) => el.classList.add("focus"));
+    const bar = document.createElement("div");
+    bar.id = "pvFocus";
+    bar.className = "pv-focus";
+    bar.innerHTML = `<span><b>${esc(C.label(id))}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : "nothing to point at on the preview (it is judged from the whole mailer or from artwork) — see the result in the table"}</span><button type="button" data-act="clear-focus" aria-label="Clear highlight">× Show all</button>`;
+    $(".pv-legend", pv).before(bar);
+    if (scroll && hits.length) hits[0].scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function knownPeople() {
@@ -987,6 +1011,7 @@
       const v = m && m.versions.find((x) => x.v === +el.dataset.v);
       if (v) downloadFile(v.fileId, m.final && m.final.v === v.v ? v.fileName.replace(/\.pdf$/i, " - FINAL.pdf") : v.fileName);
     },
+    "clear-focus": () => { S.focusItem = null; applyFocus(false); },
     "rm-reviewer": (el) => { S.draft.reviewers = S.draft.reviewers.filter((n) => n !== el.dataset.name); renderChecklist(); },
     "submit-review": () => submitReview(),
     "review-detail": (el) => reviewDetail(el.dataset.id),
@@ -1048,6 +1073,13 @@
       Promise.resolve().then(() => actions[act.dataset.act](act)).catch((err) => { console.error(err); toast(err.message, "err"); });
       return;
     }
+    const nm = e.target.closest("#checklist td.cl-name");
+    if (nm) {
+      const id = nm.closest("tr").dataset.item;
+      S.focusItem = S.focusItem === id ? null : id;
+      applyFocus(true);
+      return;
+    }
     const dec = e.target.closest("[data-dec]");
     if (dec) {
       // Update the row in place — re-rendering the table on every click loses the scroll.
@@ -1070,6 +1102,7 @@
     if (link && !e.target.closest("a[href]:not([data-href]), button, select, input, label")) go(link.dataset.href);
   });
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && e.target.matches("td.cl-name")) { e.preventDefault(); e.target.click(); return; }
     if (e.key !== "Enter" || !e.target.matches("[data-href][tabindex], [data-act][tabindex]")) return;
     e.preventDefault();
     e.target.click();

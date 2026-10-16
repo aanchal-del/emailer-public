@@ -230,6 +230,7 @@ window.BrandChecks = (() => {
     const hasText = d.totalChars >= 120;
     const out = {};
     const set = (id, status, evidence, method) => {
+      for (const mk of marks) if (!mk.item) mk.item = id;   // boxes drawn since the last check belong to this one
       out[id] = { status, evidence: evidence || "", method: method || (status === "review" ? "manual" : "auto") };
     };
     const noText = "Copy is mostly images, so this can't be read from the PDF.";
@@ -298,6 +299,7 @@ window.BrandChecks = (() => {
     const brandRefs = find(/American\s+Express(?![\s]*(Company|Banking|Bank))|Membership\s+Rewards/gi);
     const noMark = brandRefs.filter((m) => !/^\s*[®Ⓡ]/.test(joined.slice(m.index + m[0].length, m.index + m[0].length + 3)));
     for (const m of noMark) markAt(m.index, m[0].length, "warn", "® missing");
+    for (const m of brandRefs.filter((x) => !noMark.includes(x)).slice(0, 15)) markAt(m.index, m[0].length + 1, "pass", "✓ ® present");
     if (!brandRefs.length) set("trademark", "review", hasText ? "No American Express / Membership Rewards mentions in live text." : noText);
     else if (noMark.length) set("trademark", "warn", `${noMark.length} of ${brandRefs.length} mention(s) without ®: ${noMark.slice(0, 3).map(quote).join(", ")}.`);
     else set("trademark", "pass", `All ${brandRefs.length} mention(s) carry ®.`);
@@ -312,6 +314,7 @@ window.BrandChecks = (() => {
       return !/(\^\d|\*|[¹²³⁴⁵⁶⁷⁸⁹†‡])/.test(seg);
     });
     for (const m of bare) markAt(m.index, m[0].length, "warn", "Figure has no * or footnote");
+    for (const m of figures.filter((x) => !bare.includes(x)).slice(0, 15)) markAt(m.index, m[0].length, "pass", "✓ Figure has * or footnote");
     if (!figures.length) set("asterisks-numbers", "na", "No offer figures (₹, %, X, points) in the copy.");
     else if (bare.length) set("asterisks-numbers", "warn", `${bare.length} of ${figures.length} figure(s) have no asterisk/footnote: ${bare.slice(0, 4).map(quote).join(", ")}.`);
     else set("asterisks-numbers", "pass", `All ${figures.length} offer figure(s) carry an asterisk or footnote.`);

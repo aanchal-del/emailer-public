@@ -1112,6 +1112,7 @@
         </div>
       </div>
 
+      ${opts.slot ? '<div class="review-split"><div class="report-slot"></div><div class="pv-side">' : ""}
       <h3 class="section-title">Preview — what was detected</h3>
       <div class="preview" id="preview">
         <div class="pv-legend">
@@ -1130,8 +1131,7 @@
         </div>
         <div class="pv-pages" id="pvPages"><span class="pv-loading"><span class="spinner"></span>Rendering pages…</span></div>
       </div>
-      ${opts.slot ? '<div class="report-slot"></div>' : ""}
-
+      ${opts.slot ? '</div></div>' : ""}
       <h3 class="section-title">Scored findings</h3>
       ${sortChecks(r.scored).map(renderCheck).join("") || '<p class="empty">No scorable checks for this file.</p>'}
 
@@ -1370,6 +1370,7 @@
 
         const el = document.createElement("div");
         el.className = "pv-mark " + m.kind;
+        if (m.item) el.dataset.item = m.item;
         el.style.left = (left - 2) + "px";
         el.style.top = (top - 2) + "px";
         el.style.width = (w + 4) + "px";
