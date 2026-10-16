@@ -1,0 +1,22 @@
+# Secrets — never commit. The API key lives here and is read by server.py.
+.env
+
+# Local Python env for the Anthropic SDK
+.venv/
+
+# Test fixtures generated locally
+_mailer.pdf
+_tricky.pdf
+_logos.pdf
+_partners.pdf
+_flat.pdf
+_group.pdf
+
+# Internal American Express material — not for a public repo
+reference/
+
+# Old builds and abandoned attempts
+emailer-site.zip
+_old_attempts/
+.claude/
+.DS_Store

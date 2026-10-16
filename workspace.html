@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emailer Studio</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="workspace.css" />
+</head>
+<body class="studio">
+  <header class="ws-top">
+    <a class="ws-brand" href="#/">
+      <span class="amex">AMEX</span>
+      <span class="brand-text"><strong>Emailer Studio</strong><span>Mailer compliance workspace</span></span>
+    </a>
+    <nav class="ws-crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+    <div class="ws-top-right">
+      <button type="button" id="aiBadge" class="ai-badge off">✦ AI</button>
+      <button type="button" id="userBtn" class="user-chip" data-act="set-user"></button>
+    </div>
+  </header>
+
+  <div id="app"><div class="status boot"><span class="spinner"></span>Loading…</div></div>
+  <div id="modal" class="modal" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script>window.EMAILER_EMBED = true;</script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="rules.js"></script>
+  <script src="app.js"></script>
+  <script src="store.js"></script>
+  <script src="brief-reader.js"></script>
+  <script src="brand-checks.js"></script>
+  <script src="workspace.js"></script>
+</body>
+</html>

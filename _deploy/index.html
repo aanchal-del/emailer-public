@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Emailer — Mailer Compliance Checker</title>
+  <link rel="stylesheet" href="styles.css?v=9" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="amex">AMEX</span>
+      <div class="brand-text">
+        <strong>Emailer</strong>
+        <span>Mailer mobile-optimisation checker</span>
+      </div>
+    </div>
+    <a class="rules-link" id="rulesToggle" href="#rulebook">View rulebook</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Check your mailer PDF against the design guardrails</h1>
+      <p>Upload an exported email/mailer PDF. Emailer scans typography, line-height, fonts,
+         content length, CTAs, spacing, layout, images and structure against the American Express
+         Mobile Optimisation handbook — then tells you how accurate it is and what's missing.
+         Best results with a <strong>portrait mailer export</strong> (not a landscape deck).</p>
+    </section>
+
+    <section class="uploader" id="drop">
+      <input type="file" id="file" accept="application/pdf" hidden />
+      <div class="drop-inner">
+        <div class="drop-icon">⬆</div>
+        <p class="drop-title">Drop a PDF here or <button type="button" id="browse" class="link-btn">browse</button></p>
+        <!-- Default copy is the truth for the static build. If a vision server is
+             present, app.js upgrades this to disclose that pages can be sent. -->
+        <p class="drop-hint" id="privacyNote">Nothing is uploaded — analysis runs entirely in
+           your browser.</p>
+      </div>
+    </section>
+
+    <div class="accuracy-note">
+      <strong>How accurate is this?</strong> Emailer is a fast first-pass reviewer, not a final sign-off. Read results by tier:
+      <ul>
+        <li><span class="cov auto">accurate</span> <b>Auto checks</b> — font size, line-height, character counts, fonts, gradients, file size. These are <em>measured</em> from the file, so they're reliable. Only these count toward the score.</li>
+        <li><span class="cov obs">approximate</span> <b>Observations</b> — CTAs, headlines, columns, spacing, images. Detected by pattern/geometry, so they can occasionally mislabel — review by eye.</li>
+        <li><span class="cov manual">not checked</span> <b>Manual</b> — GIF weight and real on-device stacking. A static PDF doesn't contain this, so no tool can read it.</li>
+        <li id="aiTier" hidden><span class="cov ai">ai vision</span> <b>Optional AI pass</b> — text baked into images, dark-mode contrast, shadows/blur, overlapping modules. Reads the rendered page rather than the text layer, so it catches what measurement can't. <b>Opt-in per PDF, and it sends your pages to Anthropic.</b> Never scored.</li>
+      </ul>
+      <span class="accuracy-foot">Sections built as flat images can't have their text measured. The score is an indicator, not a guarantee.</span>
+    </div>
+
+    <div id="status" class="status" hidden></div>
+
+    <section id="report" class="report" hidden></section>
+
+    <section id="rulebook" class="rulebook" hidden>
+      <div class="rulebook-head">
+        <h2>Coverage — every handbook rule</h2>
+        <button type="button" id="rulesClose" class="link-btn">Hide ✕</button>
+      </div>
+      <p class="rulebook-sub">
+        Every section of the handbook is mapped below —
+        <span class="cov auto">auto</span> measured &amp; scored ·
+        <span class="cov obs">heuristic</span> detected, review by eye ·
+        <span class="cov principle">guidance</span> design principle ·
+        <span class="cov ai">ai vision</span> needs the optional AI pass ·
+        <span class="cov manual">manual</span> visual, can't be read from a PDF.
+      </p>
+
+      <!-- The handbook is internal Amex material and is not shipped in the public
+           build. app.js hides the buttons when the PDF isn't served. -->
+      <div class="ref-card" id="refCard">
+        <div class="ref-icon">📄</div>
+        <div class="ref-body">
+          <strong>Mobile Optimisation Handbook</strong>
+          <span id="refNote">The source reference these rules are built from — American Express, 24 pages.</span>
+        </div>
+        <div class="ref-actions" id="refActions">
+          <a class="btn" href="reference/mobile-optimisation-handbook.pdf" target="_blank" rel="noopener">Open PDF</a>
+          <a class="btn ghost" href="reference/mobile-optimisation-handbook.pdf" download>Download</a>
+        </div>
+      </div>
+
+      <div class="rule-grid" id="ruleGrid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="footNote">Emailer · runs locally · no data leaves your machine ·
+      <strong>build v10 · 16 Jul 2026</strong></span>
+  </footer>
+
+  <script src="vendor/pdf.min.js"></script>
+  <script src="rules.js?v=9"></script>
+  <script src="app.js?v=9"></script>
+</body>
+</html>
