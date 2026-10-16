@@ -160,6 +160,7 @@ main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
 .pv-key.fail { background: var(--fail-bg); color: var(--fail); }
 .pv-key.warn { background: var(--warn-bg); color: var(--warn); }
 .pv-key.info { background: #eef3fb; color: var(--amex-blue); }
+.pv-key.pass { background: var(--pass-bg); color: var(--pass); }
 .pv-key.off { background: #f3f5f8; color: var(--muted); text-decoration: line-through; }
 .pv-hint { font-size: 12px; color: var(--muted); margin-left: auto; }
 
@@ -185,6 +186,7 @@ main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
 .pv-mark.fail { border-color: var(--fail); background: rgba(198,40,40,.14); }
 .pv-mark.warn { border-color: var(--warn); background: rgba(183,121,31,.13); }
 .pv-mark.info { border-color: rgba(0,111,207,.75); background: rgba(0,111,207,.07); }
+.pv-mark.pass { border-color: rgba(18,133,91,.8); background: rgba(18,133,91,.07); }
 /* AI boxes keep their severity colour but are dashed, so you can always tell
    a measured finding from one Claude read off the rendered page. */
 .pv-mark.ai { border-style: dashed; border-width: 2px; }
@@ -197,6 +199,7 @@ main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
 .preview.hide-fail .pv-mark.fail:not(.ai),
 .preview.hide-warn .pv-mark.warn:not(.ai),
 .preview.hide-info .pv-mark.info:not(.ai),
+.preview.hide-pass .pv-mark.pass:not(.ai),
 .preview.hide-ai .pv-mark.ai { display: none; }
 
 /* Tags sit beside the box (never above it) so they can't cover the line above. */
@@ -214,6 +217,7 @@ main { max-width: 920px; margin: 0 auto; padding: 32px 20px 60px; }
 .pv-mark.fail .pv-tag { background: var(--fail); }
 .pv-mark.warn .pv-tag { background: var(--warn); }
 .pv-mark.info .pv-tag { background: var(--amex-blue); }
+.pv-mark.pass .pv-tag { background: var(--pass); }
 .pv-mark.fail .pv-tag { opacity: 1; }                 /* errors are always labelled */
 .pv-mark:hover { border-width: 2px; z-index: 5; }
 .pv-mark:hover .pv-tag { opacity: 1; z-index: 6; }

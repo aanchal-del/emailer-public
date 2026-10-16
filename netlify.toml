@@ -1,0 +1,10 @@
+# Netlify builds the static site from this repo on every push to main.
+[build]
+  command = "bash build.sh"
+  publish = "_deploy"
+
+# The workspace is the main app; the original single-page checker stays at /index.html.
+[[redirects]]
+  from = "/"
+  to = "/workspace.html"
+  status = 302

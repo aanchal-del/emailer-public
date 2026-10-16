@@ -14,98 +14,107 @@
     for (const k of Object.keys(pdfjsLib.OPS)) m[pdfjsLib.OPS[k]] = k;
     return m;
   })();
-  const drop = $("#drop");
-  const fileInput = $("#file");
-  const statusEl = $("#status");
-  const reportEl = $("#report");
-
-  /* ---------- wiring ---------- */
-  $("#browse").addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
-  drop.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
-  ["dragenter", "dragover"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
-  ["dragleave", "drop"].forEach((ev) =>
-    drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
-  drop.addEventListener("drop", (e) => {
-    const f = e.dataTransfer.files[0];
-    if (f && f.type === "application/pdf") handleFile(f);
-    else showStatus("Please drop a PDF file.", true);
-  });
-
-  renderCoverage();
-
   /* ---------- environment probes ----------
      The same build runs locally (with a vision server + the handbook) and as a
      static deploy (with neither). Rather than fork the HTML, ask the environment
      what exists and make the page's claims match it. */
 
-  // Resolves true only when a server is holding an API key. On a static host the
-  // 404 page fails to parse as JSON, which lands in catch → false.
-  const visionReady = fetch("/api/vision")
-    .then((r) => r.json()).then((i) => !!i.available).catch(() => false);
-
-  visionReady.then((ok) => {
-    if (!ok) return;                       // defaults in the HTML are already correct
-    $("#aiTier").hidden = false;
-    $("#privacyNote").textContent = "Rule checks run entirely in your browser. Pages are " +
-      "only sent to Anthropic if you explicitly run the AI vision pass on the report.";
-    $("#footNote").innerHTML = "Emailer · rule checks run locally · pages leave your machine " +
-      "only when you run the AI vision pass · <strong>build v10 · 16 Jul 2026</strong>";
-  });
-
-  // The handbook is internal Amex material and isn't shipped publicly.
-  fetch("reference/mobile-optimisation-handbook.pdf", { method: "HEAD" })
-    .then((r) => { if (!r.ok) throw new Error("absent"); })
-    .catch(() => {
-      $("#refActions").hidden = true;
-      $("#refNote").textContent = "The source reference these rules are built from — American " +
-        "Express, 24 pages. Not bundled in this build; refer to your internal copy.";
-    });
-
-  /* ---------- rulebook toggle (hidden until requested) ---------- */
-  const rulebookEl = $("#rulebook");
-  const rulesToggle = $("#rulesToggle");
-  function setRulebook(show) {
-    rulebookEl.hidden = !show;
-    rulesToggle.textContent = show ? "Hide rulebook" : "View rulebook";
-    if (show) rulebookEl.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-  rulesToggle.addEventListener("click", (e) => { e.preventDefault(); setRulebook(rulebookEl.hidden); });
-  $("#rulesClose").addEventListener("click", () => {
-    setRulebook(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
+  // Resolves true only when the server holds a key Anthropic accepts. On a static
+  // host the 404 page fails to parse as JSON, which lands in catch → false.
+  const aiStatus = fetch("/api/status")
+    .then((r) => r.json())
+    .catch(() => ({ available: false, reason: "AI server not running — start it with ./start.sh" }));
+  const visionReady = aiStatus.then((i) => !!i.available);
 
   /* In-memory session state only — the uploaded PDF & result live here while you use
      the app (so toggling the rulebook never loses your report) and are cleared on reload. */
   const session = { file: null, result: null };
 
-  function showStatus(msg, isErr, busy) {
-    statusEl.hidden = false;
-    statusEl.className = "status" + (isErr ? " err" : "");
-    statusEl.innerHTML = (busy ? '<span class="spinner"></span>' : "") + msg;
+  async function analyseFile(file) {
+    const data = await withTimeout(extractPdf(file), 45000,
+      "PDF parsing timed out — the file may be corrupt or the PDF worker failed to load.");
+    return analyse(data, file);
   }
 
-  /* ---------- main flow ---------- */
-  let analysing = false;
-  async function handleFile(file) {
-    if (analysing) return;            // ignore re-drops while one is in flight
-    analysing = true;
-    reportEl.hidden = true;
-    showStatus(`Analysing <strong>&nbsp;${escapeHtml(file.name)}</strong>…`, false, true);
-    try {
-      const data = await withTimeout(extractPdf(file), 45000,
-        "PDF parsing timed out — the file may be corrupt or the PDF worker failed to load.");
-      const result = analyse(data, file);
-      session.file = file; session.result = result;  // keep in memory for this session
-      renderReport(result, file);
-      statusEl.hidden = true;         // done — remove the spinner
-    } catch (err) {
-      console.error(err);
-      showStatus("Could not read this PDF: " + escapeHtml(err.message || String(err)), true);
-    } finally {
-      analysing = false;
+  /* ---------- standalone page (index.html) ---------- */
+  function initStandalone() {
+    const drop = $("#drop");
+    const fileInput = $("#file");
+    const statusEl = $("#status");
+    const reportEl = $("#report");
+
+    $("#browse").addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
+    drop.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+    ["dragenter", "dragover"].forEach((ev) =>
+      drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) =>
+      drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
+    drop.addEventListener("drop", (e) => {
+      const f = e.dataTransfer.files[0];
+      if (f && f.type === "application/pdf") handleFile(f);
+      else showStatus("Please drop a PDF file.", true);
+    });
+
+    renderCoverage($("#ruleGrid"));
+
+    visionReady.then((ok) => {
+      if (!ok) return;                       // defaults in the HTML are already correct
+      $("#aiTier").hidden = false;
+      $("#privacyNote").textContent = "Rule checks run entirely in your browser. Pages are " +
+        "only sent to Anthropic if you explicitly run the AI vision pass on the report.";
+      $("#footNote").innerHTML = "Emailer · rule checks run locally · pages leave your machine " +
+        "only when you run the AI vision pass · <strong>build v10 · 16 Jul 2026</strong>";
+    });
+
+    // The handbook is internal Amex material and isn't shipped publicly.
+    fetch("reference/mobile-optimisation-handbook.pdf", { method: "HEAD" })
+      .then((r) => { if (!r.ok) throw new Error("absent"); })
+      .catch(() => {
+        $("#refActions").hidden = true;
+        $("#refNote").textContent = "The source reference these rules are built from — American " +
+          "Express, 24 pages. Not bundled in this build; refer to your internal copy.";
+      });
+
+    const rulebookEl = $("#rulebook");
+    const rulesToggle = $("#rulesToggle");
+    function setRulebook(show) {
+      rulebookEl.hidden = !show;
+      rulesToggle.textContent = show ? "Hide rulebook" : "View rulebook";
+      if (show) rulebookEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    rulesToggle.addEventListener("click", (e) => { e.preventDefault(); setRulebook(rulebookEl.hidden); });
+    $("#rulesClose").addEventListener("click", () => {
+      setRulebook(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    function showStatus(msg, isErr, busy) {
+      statusEl.hidden = false;
+      statusEl.className = "status" + (isErr ? " err" : "");
+      statusEl.innerHTML = (busy ? '<span class="spinner"></span>' : "") + msg;
+    }
+
+    let analysing = false;
+    async function handleFile(file) {
+      if (analysing) return;            // ignore re-drops while one is in flight
+      analysing = true;
+      reportEl.hidden = true;
+      showStatus(`Analysing <strong>&nbsp;${escapeHtml(file.name)}</strong>…`, false, true);
+      try {
+        const result = await analyseFile(file);
+        session.file = file; session.result = result;  // keep in memory for this session
+        renderReport(result, file, reportEl, {
+          scroll: true,
+          onAgain: () => { fileInput.value = ""; reportEl.hidden = true; window.scrollTo({ top: 0, behavior: "smooth" }); }
+        });
+        statusEl.hidden = true;         // done — remove the spinner
+      } catch (err) {
+        console.error(err);
+        showStatus("Could not read this PDF: " + escapeHtml(err.message || String(err)), true);
+      } finally {
+        analysing = false;
+      }
     }
   }
 
@@ -126,6 +135,7 @@
     const vectors = [];      // painted vector paths — logos, icons, buttons, rules
     const opCounts = {};     // which drawing ops this PDF actually uses (diagnostics)
     const tinyImages = [];   // images skipped as <=1px — spacers, tracking pixels
+    const links = [];        // hyperlink hot-spots, PDF user space — only present if the export kept them
     let imageCount = 0, totalChars = 0;
     let page1W = 0, page1H = 0;
     let hasGradient = false, gradientCount = 0;
@@ -137,8 +147,14 @@
       pageSizes[p] = { w: vp.width, h: vp.height };
       if (p === 1) { page1W = vp.width; page1H = vp.height; }
 
+      try {
+        for (const a of await page.getAnnotations())
+          if (a.subtype === "Link" && a.rect) links.push({ page: p, rect: a.rect, url: a.url || a.unsafeUrl || null });
+      } catch (_) {}
+
       const content = await page.getTextContent();
       const styles = content.styles || {};
+      const painted = new Set();
       for (const it of content.items) {
         // Keep the run's own spacing — pdf.js emits word gaps as their own
         // whitespace-only runs, and dropping them fuses "FROM" onto "AMERICAN".
@@ -146,6 +162,11 @@
         const str = it.str || "";
         if (!str) continue;
         const t = it.transform || [1, 0, 0, 1, 0, 0];
+        // Some exports paint the same run twice at the same spot (overprint / fake
+        // bold). Counting both doubles the copy and garbles every text check.
+        const at = `${Math.round(t[4])}|${Math.round(t[5])}|${str}`;
+        if (str.trim() && painted.has(at)) continue;
+        painted.add(at);
         let size = it.height && it.height > 0 ? it.height : Math.hypot(t[2], t[3]);
         size = Math.round(size * 10) / 10;
         const fam = styles[it.fontName] && styles[it.fontName].fontFamily
@@ -261,7 +282,7 @@
       imageCount, imageSizes, hasGradient, gradientCount, totalChars, page1W, page1H,
       blocks: buildBlocks(readingOrder(items)),
       graphics: clusterVectors(vectors, page1W, page1H),
-      pageSizes, opCounts, tinyImages
+      pageSizes, opCounts, tinyImages, links
     };
   }
 
@@ -739,9 +760,10 @@
 
       const rank = { fail: 0, warn: 1, info: 2 };
       const worst = v.reduce((a, x) => (rank[x[0]] < rank[a] ? x[0] : a), "info");
-      mark(b.page, blockRect(b), worst,
+      // A real element that breaks nothing is a measured pass, and shows as one.
+      mark(b.page, blockRect(b), v.length ? worst : role === "symbol" ? "info" : "pass",
         v.length ? v.map((x) => x[1]).join(" · ")
-                 : `${role} · ${fmt1(b.size)}px · ${b.chars} chars`);
+                 : `✓ ${role} · ${fmt1(b.size)}px · ${b.chars} chars`);
     }
 
     /* ---- Images (scale-independent) ---- */
@@ -908,7 +930,7 @@
     const score = total ? Math.round((got / total) * 100) : 0;
 
     return {
-      score, scored, obs, geo: g, marks: dedupeMarks(marks), pdf: d.pdf,
+      score, scored, obs, geo: g, marks: dedupeMarks(marks), pdf: d.pdf, data: d, bodySize, ctas,
       // Structure only — sizes, positions and operator counts. No text, no image data.
       diag: {
         pages: d.numPages, pageW: Math.round(d.page1W), pageH: Math.round(d.page1H),
@@ -951,7 +973,7 @@
   /* One box per region: several rules can flag the same run (e.g. "under 12px" and
      "fine print"), so keep the worst status and merge the labels into it. */
   function dedupeMarks(marks) {
-    const rank = { fail: 0, warn: 1, info: 2 };
+    const rank = { fail: 0, warn: 1, pass: 2, info: 3 };
     const byKey = new Map();
     for (const m of marks) {
       const key = m.page + ":" + m.space + ":" + m.rect.map((v) => Math.round(v)).join(",");
@@ -1037,7 +1059,11 @@
   }
 
   /* ---------- rendering ---------- */
-  function renderReport(r, file) {
+  /* opts: scroll, onAgain (show "Check another PDF"), slot (empty .report-slot after the
+     preview for the host page), onVision(marks, res) when an AI pass finishes, and
+     vision {marks, res} to re-apply a pass that was run earlier. */
+  function renderReport(r, file, reportEl, opts) {
+    opts = opts || {};
     const verdict =
       r.score >= 85 ? "Strong — ready with only minor tweaks." :
       r.score >= 65 ? "Good, but several items need attention." :
@@ -1050,8 +1076,8 @@
     const banner = r.geo.note
       ? `<div class="banner">⚠ ${escapeHtml(r.geo.note)}</div>` : "";
 
-    const nMarks = { fail: 0, warn: 0, info: 0 };
-    for (const m of r.marks) nMarks[m.kind]++;
+    const nMarks = { fail: 0, warn: 0, info: 0, pass: 0 };
+    for (const m of r.marks) nMarks[m.kind] = (nMarks[m.kind] || 0) + 1;
 
     const manualItems = RB.coverage.filter((c) => c.mode === "manual")
       .map((c) => `<li><strong>${escapeHtml(c.cat)}</strong> (${c.page}): ${escapeHtml(c.rule)}</li>`).join("");
@@ -1091,6 +1117,7 @@
         <div class="pv-legend">
           <button type="button" class="pv-key fail" data-kind="fail">✕ Errors <b>${nMarks.fail}</b></button>
           <button type="button" class="pv-key warn" data-kind="warn">! To fix <b>${nMarks.warn}</b></button>
+          <button type="button" class="pv-key pass" data-kind="pass">✓ Passed <b>${nMarks.pass}</b></button>
           <button type="button" class="pv-key info" data-kind="info">◻ Detected <b>${nMarks.info}</b></button>
           <button type="button" class="pv-key ai" data-kind="ai" hidden>✦ AI vision <b>0</b></button>
           <span class="pv-hint">Click a key to show/hide those boxes · hover a box for the reason</span>
@@ -1103,6 +1130,7 @@
         </div>
         <div class="pv-pages" id="pvPages"><span class="pv-loading"><span class="spinner"></span>Rendering pages…</span></div>
       </div>
+      ${opts.slot ? '<div class="report-slot"></div>' : ""}
 
       <h3 class="section-title">Scored findings</h3>
       ${sortChecks(r.scored).map(renderCheck).join("") || '<p class="empty">No scorable checks for this file.</p>'}
@@ -1127,50 +1155,53 @@
 
       <div class="report-actions">
         <button class="btn" id="printBtn">Save / print report</button>
-        <button class="btn ghost" id="againBtn">Check another PDF</button>
+        ${opts.onAgain ? '<button class="btn ghost" id="againBtn">Check another PDF</button>' : ""}
       </div>
     `;
+    const q = (s) => reportEl.querySelector(s);
     reportEl.hidden = false;
-    requestAnimationFrame(() => { reportEl.querySelector(".bar").style.strokeDashoffset = offset; });
-    reportEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    requestAnimationFrame(() => { q(".bar").style.strokeDashoffset = offset; });
+    if (opts.scroll) reportEl.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    $("#diagCopy").addEventListener("click", (e) => {
-      navigator.clipboard.writeText($("#diagText").textContent).then(() => {
+    q("#diagCopy").addEventListener("click", (e) => {
+      navigator.clipboard.writeText(q("#diagText").textContent).then(() => {
         e.target.textContent = "Copied ✓";
         setTimeout(() => { e.target.textContent = "Copy diagnostics"; }, 1500);
       }).catch(() => { e.target.textContent = "Select the text below and copy"; });
     });
 
-    $("#printBtn").addEventListener("click", () => window.print());
-    $("#againBtn").addEventListener("click", () => {
-      fileInput.value = ""; reportEl.hidden = true;
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    q("#printBtn").addEventListener("click", () => window.print());
+    if (opts.onAgain) q("#againBtn").addEventListener("click", opts.onAgain);
 
-    const preview = $("#preview");
+    const preview = q("#preview");
     preview.querySelectorAll(".pv-key").forEach((btn) => {
       btn.addEventListener("click", () => {
         const off = preview.classList.toggle("hide-" + btn.dataset.kind);
         btn.classList.toggle("off", off);
       });
     });
-    renderPreview($("#pvPages"), r.pdf, r.marks).catch((err) => {
+    const rendered = renderPreview(q("#pvPages"), r.pdf, r.marks).catch((err) => {
       console.error(err);
-      $("#pvPages").innerHTML = '<p class="empty">Could not render a preview of this PDF.</p>';
+      q("#pvPages").innerHTML = '<p class="empty">Could not render a preview of this PDF.</p>';
     });
 
-    // The vision pass only appears when a server is actually holding an API key.
+    if (opts.vision && opts.vision.marks) {
+      // A pass already ran on this file — redraw it instead of offering it again.
+      rendered.then(() => addVisionMarks(opts.vision.marks, opts.vision.res));
+      return;
+    }
+    // The vision pass only appears when a server is actually holding a working key.
     visionReady.then((ok) => {
       if (!ok) return;
-      $("#pvAi").hidden = false;
-      $("#visionBtn").addEventListener("click", () => runVision(r), { once: true });
+      q("#pvAi").hidden = false;
+      q("#visionBtn").addEventListener("click", () => runVision(r, opts.onVision), { once: true });
     });
   }
 
   /* ---------- optional AI vision pass ---------- */
   // Rendered pages go to Anthropic via our own server, which holds the key.
   // Findings are never scored — they're heuristic, like the other observations.
-  async function runVision(r) {
+  async function runVision(r, onVision) {
     const btn = $("#visionBtn"), note = $(".pv-ai-note");
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>Reading pages…';
@@ -1194,6 +1225,7 @@
         label: `✦ ${f.label}`, detail: f.explanation, rule: f.rule
       }));
       addVisionMarks(marks, res);
+      if (onVision) onVision(marks, res);
     } catch (err) {
       console.error(err);
       btn.hidden = true;
@@ -1275,6 +1307,7 @@
     for (const m of marks) counts[m.kind]++;
     const skipped = res.pagesSkipped
       ? ` <strong>${res.pagesSkipped} page(s) were not analysed</strong> (${res.pagesAnalysed}-page cap).` : "";
+    $("#pvAi").hidden = false;
     $("#pvAi").innerHTML =
       `<span class="pv-ai-done">✦ ${res.model} read ${res.pagesAnalysed} page(s) and found
         ${marks.length} item(s) — ${counts.fail} error, ${counts.warn} to fix, ${counts.info} noted.
@@ -1396,8 +1429,7 @@
     return [...checks].sort((a, b) => order[a.status] - order[b.status] || b.weight - a.weight);
   }
 
-  function renderCoverage() {
-    const grid = $("#ruleGrid");
+  function renderCoverage(grid) {
     const cats = {};
     for (const c of RB.coverage) (cats[c.cat] = cats[c.cat] || []).push(c);
     const badge = (m) => m === "auto" ? '<span class="cov auto">auto</span>'
@@ -1424,4 +1456,12 @@
     if (b < 1024 * 1024) return (b / 1024).toFixed(0) + " KB";
     return (b / 1024 / 1024).toFixed(2) + " MB";
   }
+
+  window.EmailerEngine = {
+    RB, analyseFile, renderReport, renderCoverage, renderPagesForVision, blockRect,
+    aiStatus, escapeHtml, trim, fmtBytes, isTitleCase, isCtaLike, isViewOnline,
+    isMarkGlyph, isSubstantive
+  };
+
+  if (!window.EMAILER_EMBED) initStandalone();
 })();

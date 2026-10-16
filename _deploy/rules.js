@@ -121,6 +121,68 @@ window.RULEBOOK = {
 
     { cat: "Understanding coding", page: "p10",    mode: "principle", rule: "Prefer codeable blocks: solid bg, borders, cards, simple CTA, 1–3 col" },
     { cat: "Common challenges",    page: "p18–21", mode: "principle", rule: "Connected columns & mixed image/code sections cause imbalance" },
-    { cat: "Way forward",          page: "p19,23", mode: "principle", rule: "Design every block to stack; codeable before decorative" }
+    { cat: "Way forward",          page: "p19,23", mode: "principle", rule: "Design every block to stack; codeable before decorative" },
+
+    // American Express Brand & Compliance Rules
+    { cat: "Brand Requirements", page: "amex", mode: "principle", rule: "Power of Trust statement must appear in all mailers" },
+    { cat: "Brand Requirements", page: "amex", mode: "principle", rule: "India's most trusted credit card brand — 11 years in a row" },
+    { cat: "Brand Requirements", page: "amex", mode: "auto", rule: "Registered trademark ® on all American Express references" },
+    { cat: "Brand Requirements", page: "amex", mode: "principle", rule: "Use American Express® branding consistently" },
+
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Headers in Title Case (first letter of all words capitalized)" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Sentence case copy must end with full stop (period)" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Title case copy must NOT have full stop" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Card Member (two words), not Cardmember" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Card Membership (two words)" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "American Express® cannot be split across lines" },
+    { cat: "Typography", page: "amex", mode: "auto", rule: "T&Cs Apply — T, C & A in uppercase" },
+    { cat: "Typography", page: "amex", mode: "obs", rule: "Prefer UK English spelling unless specified" },
+
+    { cat: "Special Characters", page: "amex", mode: "auto", rule: "Asterisks on all numbers with footnotes" },
+    { cat: "Special Characters", page: "amex", mode: "obs", rule: "Asterisks NOT hyperlinked, same color as body copy" },
+    { cat: "Special Characters", page: "amex", mode: "obs", rule: "Superscripts match relevant body copy pointers" },
+    { cat: "Special Characters", page: "amex", mode: "obs", rule: "Log In (Sentence Case)" },
+
+    { cat: "Content Length", page: "amex", mode: "auto", rule: "Pre-header ends with full stop (period)" },
+    { cat: "Content Length", page: "amex", mode: "obs", rule: "Pre-header left-aligned and vertically centered" },
+    { cat: "Content Length", page: "amex", mode: "obs", rule: "Pre-header balanced with No images copy length" },
+
+    { cat: "Card Names", page: "amex", mode: "obs", rule: "Card names in single line, never split or cut off" },
+    { cat: "Card Names", page: "amex", mode: "obs", rule: "Card names grammatically correct" },
+    { cat: "Card Names", page: "amex", mode: "principle", rule: "Plat Charge creatives: SK signature at end of body" },
+    { cat: "Card Names", page: "amex", mode: "principle", rule: "Port Cards: American Express Banking Corp. at end of body" },
+
+    { cat: "Hyperlinks", page: "amex", mode: "obs", rule: "Click Here — 'Here' must be hyperlinked" },
+    { cat: "Hyperlinks", page: "amex", mode: "obs", rule: "All relevant text links must be active" },
+
+    { cat: "Footer", page: "amex", mode: "auto", rule: "Address: DLF City Phase II format required" },
+    { cat: "Footer", page: "amex", mode: "obs", rule: "Address with proper line breaks" },
+    { cat: "Footer", page: "amex", mode: "obs", rule: "American Express Banking Corp. right-aligned" },
+    { cat: "Footer", page: "amex", mode: "auto", rule: "© 2026 American Express Company. All rights reserved." },
+    { cat: "Footer", page: "amex", mode: "auto", rule: "® Registered trademark of American Express Company" },
+    { cat: "Footer", page: "amex", mode: "principle", rule: "Servicing mailer: NO Unsubscribe in footer" },
+    { cat: "Footer", page: "amex", mode: "obs", rule: "Standard mailer footer: Privacy, Contact Us, Update Email, Unsubscribe" },
+    { cat: "Footer", page: "amex", mode: "obs", rule: "Footer links in Title Case" },
+
+    { cat: "Images", page: "amex", mode: "obs", rule: "Images must be Indian in context" },
+    { cat: "Images", page: "amex", mode: "principle", rule: "Source images from Brand Box first" },
+    { cat: "Images", page: "amex", mode: "obs", rule: "Registered American Express logo on all card emailers" },
+
+    { cat: "Design Principles", page: "amex", mode: "principle", rule: "Avoid excessive use of grey in creative" },
+    { cat: "Design Principles", page: "amex", mode: "principle", rule: "Avoid box layouts — use icons instead" },
+    { cat: "Design Principles", page: "amex", mode: "principle", rule: "Use icons to represent benefits and features" },
+    { cat: "Design Principles", page: "amex", mode: "principle", rule: "Card color used for Don't live life tagline" },
+    { cat: "Design Principles", page: "amex", mode: "obs", rule: "Maintain primary brand blue with card-specific accents" },
+
+    { cat: "CTAs", page: "amex", mode: "principle", rule: "CTA button present depending on emailer type" },
+    { cat: "CTAs", page: "amex", mode: "obs", rule: "CTA matches emailer purpose (Apply, Learn, Discover, etc.)" },
+
+    { cat: "Content Quality", page: "amex", mode: "principle", rule: "All copy free of spelling, grammar, punctuation errors" },
+    { cat: "Content Quality", page: "amex", mode: "principle", rule: "Body copy clear, concise, benefit-focused" },
+    { cat: "Content Quality", page: "amex", mode: "principle", rule: "Benefits highlighted prominently with icons" },
+    { cat: "Content Quality", page: "amex", mode: "obs", rule: "Line breaks must make sense — no awkward cuts" },
+
+    { cat: "Mobile Optimization", page: "amex", mode: "obs", rule: "All content remains readable on mobile" },
+    { cat: "Mobile Optimization", page: "amex", mode: "obs", rule: "Card names fit on single line mobile" }
   ]
 };

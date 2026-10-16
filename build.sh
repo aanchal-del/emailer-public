@@ -19,7 +19,8 @@ OUT="_deploy"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-cp index.html app.js rules.js styles.css "$OUT/"
+cp index.html app.js rules.js styles.css manual-review.js \
+   workspace.html workspace.css workspace.js store.js brief-reader.js brand-checks.js "$OUT/"
 cp -R vendor "$OUT/"
 
 # Netlify: long-cache the pinned vendor bundle, never cache the app shell.
@@ -36,6 +37,9 @@ if grep -rlq "sk-ant" "$OUT" 2>/dev/null; then
   echo "ABORT: an API key reached the build output." >&2
   exit 1
 fi
+
+# On Netlify (git deploys) the folder is all that's needed — skip the Drop zip.
+if [ -n "${NETLIFY:-}" ]; then echo "Built $OUT/ for Netlify"; exit 0; fi
 
 # Zip for Netlify Drop. Files must sit at the ZIP ROOT — a wrapping folder inside
 # the archive makes Netlify serve a 404 instead of the site.
