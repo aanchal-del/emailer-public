@@ -33,6 +33,10 @@ cat > "$OUT/_headers" <<'EOF'
   Referrer-Policy: no-referrer
 EOF
 
+# Open the workspace at the site root. Lives in the output (not just netlify.toml)
+# so a dragged-in Netlify Drop zip gets it too.
+echo "/   /workspace.html   302" > "$OUT/_redirects"
+
 if grep -rlq "sk-ant" "$OUT" 2>/dev/null; then
   echo "ABORT: an API key reached the build output." >&2
   exit 1

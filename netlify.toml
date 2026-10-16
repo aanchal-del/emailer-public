@@ -2,9 +2,4 @@
 [build]
   command = "bash build.sh"
   publish = "_deploy"
-
-# The workspace is the main app; the original single-page checker stays at /index.html.
-[[redirects]]
-  from = "/"
-  to = "/workspace.html"
-  status = 302
+# The root → workspace redirect lives in _deploy/_redirects (written by build.sh).
