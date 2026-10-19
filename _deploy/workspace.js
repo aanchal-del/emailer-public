@@ -364,6 +364,32 @@
   }
 
   /* ---------- mailer view ---------- */
+  // Brief requirements as checklist rows. Decisions are stored under "brief:<id>".
+  const BRIEF_SUGGEST = { found: "pass", missing: "fail", conflict: "fail", superseded: "na" };
+  function briefRows(m, ver, a) {
+    const briefs = briefsFor(m);
+    if (!briefs.length) return [];
+    const ai = Object.fromEntries(((ver.briefAI && ver.briefAI.results) || []).map((x) => [x.id, x]));
+    return B.checkAll(briefs, a.brand.text).map((x) => {
+      const r = ai[x.req.id];
+      const status = r && x.status !== "superseded" ? r.status : x.status;
+      return { id: "brief:" + x.req.id, req: x.req, brief: x.brief, priority: x.priority, status,
+               note: r ? r.note : x.note, evidence: x.evidence, method: r ? "ai" : "auto", suggested: BRIEF_SUGGEST[status] || null };
+    });
+  }
+  function briefMarks(rows, brand) {
+    const kind = { found: "pass", partial: "warn", conflict: "fail", verify: "info" };
+    const out = [];
+    for (const row of rows) {
+      if (!kind[row.status]) continue;
+      for (const re of B.needles(row.req))
+        for (const hit of brand.locate(re, 2))
+          out.push({ ...hit, kind: kind[row.status], label: `Brief: ${E.trim(row.req.text, 60)}`, space: "pdf", item: row.id });
+    }
+    return out;
+  }
+  const briefSig = (m) => briefsFor(m).map((b) => b.id + "." + (b.requirements || []).length).join(",");
+
   function newDraft(key, items) {
     const decisions = {};
     for (const i of items) if (DECIDED.includes(i.status)) decisions[i.id] = i.status;
@@ -376,11 +402,13 @@
     if (!m) { view.innerHTML = `<div class="empty-card"><h3>This mailer was deleted.</h3><a href="${P()}/upload">Back to uploads</a></div>`; return; }
     const ver = (rt.v && m.versions.find((x) => x.v === rt.v)) || latest(m);
     const key = `${m.id}:${ver.v}:${m.type}`;
-    if (view.dataset.mounted === key && S.current && S.current.key === key) {
+    // Re-mount (and redraw the preview boxes) when the briefs change; the draft survives.
+    const mkey = `${key}|${briefSig(m)}`;
+    if (view.dataset.mounted === mkey && S.current && S.current.key === key) {
       S.current.m = m; S.current.ver = ver;
       return refreshMailer();
     }
-    view.dataset.mounted = key;
+    view.dataset.mounted = mkey;
     view.innerHTML = `<div id="mhead"></div><div id="pipe"></div>
       <div class="mailer-body">
         <div class="mailer-main"><div class="status" id="mStatus">${spinner}Analysing ${esc(ver.fileName)}…</div><div id="report" class="report" hidden></div></div>
@@ -392,14 +420,14 @@
     let a;
     try { a = await analysisFor(m, ver); }
     catch (err) {
-      if (view.dataset.mounted === key) $("#mStatus").outerHTML = `<div class="status err">Could not analyse this PDF: ${esc(err.message)}</div>`;
+      if (view.dataset.mounted === mkey) $("#mStatus").outerHTML = `<div class="status err">Could not analyse this PDF: ${esc(err.message)}</div>`;
       return;
     }
-    if (seq !== renderSeq || view.dataset.mounted !== key) return;
+    if (seq !== renderSeq || view.dataset.mounted !== mkey) return;
     S.current.a = a;
     if (!S.draft || S.draft.key !== key) S.draft = newDraft(key, itemsFor(ver, a.brand));
     $("#mStatus").remove();
-    const r = { ...a.r, marks: a.r.marks.concat(a.brand.marks) };
+    const r = { ...a.r, marks: a.r.marks.concat(a.brand.marks, briefMarks(briefRows(m, ver, a), a.brand)) };
     E.renderReport(r, a.file, $("#report"), { slot: true, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
     $("#report .report-slot").innerHTML = '<div id="checklist"></div>';
     S.focusItem = null;
@@ -476,6 +504,47 @@
       <li data-act="review-detail" data-id="${esc(r.id)}" tabindex="0"><span class="stage-tag ${r.stage}">${r.stage === "final" ? "Final" : "Manual"}</span>
         <b>${esc(r.reviewers.join(", "))}</b> ${r.verdict ? (r.verdict === "approved" ? "· approved ✓" : "· changes requested") : ""}
         · ${r.tally.pass} pass / ${r.tally.fail} fail · ${fmtDate(r.at)}</li>`).join("");
+    const seg = (id, dec) => ["pass", "fail", "na"].map((v) => `<button type="button" class="${dec === v ? "on " + v : ""}" data-dec="${v}" aria-pressed="${dec === v}">${{ pass: "✓ Pass", fail: "✕ Fail", na: "N/A" }[v]}</button>`).join("");
+
+    // Brief requirements — same table, same decisions, pre-filled where the match is certain.
+    const bRows = briefRows(m, ver, a);
+    for (const row of bRows) if (!(row.id in d.decisions) && row.suggested) d.decisions[row.id] = row.suggested;
+    const BADGE = { found: ["pass", "Found"], partial: ["warn", "Partial"], missing: ["fail", "Missing"], conflict: ["fail", "Conflict"],
+                    verify: ["review", "Verify"], superseded: ["na", "Replaced"] };
+    const bAuto = bRows.filter((r) => r.suggested && r.method === "auto").length;
+    const bAI = bRows.filter((r) => r.suggested && r.method === "ai").length;
+    const bDecided = bRows.filter((r) => d.decisions[r.id]).length;
+    const bCounts = {};
+    for (const r of bRows) bCounts[r.status] = (bCounts[r.status] || 0) + 1;
+    const briefs = briefsFor(m);
+    const briefTable = bRows.map((r) => {
+      const dec = d.decisions[r.id];
+      const [cls, word] = BADGE[r.status] || ["review", r.status];
+      return `<tr data-item="${esc(r.id)}" class="${dec ? "" : "undecided"}${S.focusItem === r.id ? " focus" : ""}${r.status === "superseded" ? " replaced" : ""}">
+        <td class="cl-name" tabindex="0" title="Show on the preview"><b>${esc(r.req.text)}</b>
+          <small><span class="prio ${r.priority === 1 ? "top" : ""}">P${r.priority}</span> ${esc(r.brief.title)} · ${esc(r.req.kind)}</small></td>
+        <td><span class="badge ${cls}">${word}</span> ${r.method === "ai" ? '<span class="meth ai">✦ AI</span>' : '<span class="meth auto">Auto</span>'}
+          <div class="ev">${esc(r.note)}</div>${r.evidence && r.status !== "superseded" ? `<div class="ev quote">${esc(r.evidence)}</div>` : ""}</td>
+        <td><div class="seg">${seg(r.id, dec)}</div>${dec && dec === r.suggested && !d.touched[r.id] ? '<small class="pre">pre-filled</small>' : ""}</td>
+      </tr>`;
+    }).join("");
+    const briefCard = `<div class="card checklist brief-check">
+      <div class="cl-head">
+        <div><h3>Brief check</h3>
+          <p class="muted small">${briefs.length ? `Every requirement from ${briefs.length} brief(s), newest (P1) first — where briefs disagree the newer one wins and older lines show as replaced. Click a requirement to find it on the preview.` : "No brief is linked to this mailer yet."}</p></div>
+        ${briefs.length ? `<div class="cl-actions"><button class="btn ghost sm ai-btn" data-act="ai-brief-check" ${aiAttr()}>✦ AI brief check</button>${aiNote()}
+          ${ver.briefAI ? `<span class="ai-off-note">✦ AI checked ${fmtDate(ver.briefAI.at)} by ${esc(ver.briefAI.by)}</span>` : ""}</div>` : ""}
+      </div>
+      ${briefs.length ? `<div class="cl-split">
+          ${Object.entries(BADGE).filter(([k]) => bCounts[k]).map(([k, [c, w]]) => `<span class="sp b-${c}">${bCounts[k]} ${w.toLowerCase()}</span>`).join("")}
+          <span class="sp prog">${bDecided}/${bRows.length} decided</span></div>
+        ${bRows.length ? `<div class="table-wrap"><table class="cl-table">
+          <thead><tr><th>Brief requirement</th><th>Automated result</th><th>Reviewer decision</th></tr></thead>
+          <tbody>${briefTable}</tbody></table></div>` : `<p class="muted">The linked brief(s) have no checkable requirements — <a href="${P()}/briefs">add some</a>.</p>`}
+        <p class="muted small">${bAuto} decided automatically${bAI ? `, ${bAI} by AI` : ""} · partial and “verify” lines need your call.</p>`
+        : `<a class="btn sm" href="${P()}/briefs">+ Add a brief</a>`}
+    </div>`;
+
     box.innerHTML = `<div class="card checklist">
       <div class="cl-head">
         <div><h3>Amex brand & copy checklist</h3>
@@ -489,6 +558,10 @@
       <div class="table-wrap"><table class="cl-table">
         <thead><tr><th>Check</th><th>Automated result</th><th>Reviewer decision</th></tr></thead>
         <tbody>${rows}</tbody></table></div>
+      </div>
+      ${briefCard}
+      <div class="card checklist">
+      <h3>Submit the check</h3>
       <div class="review-form">
         <div class="rf-row"><span class="rf-l">Stage</span>
           <div class="seg big"><button type="button" class="${d.stage === "manual" ? "on" : ""}" data-stage="manual">👤 Manual check</button><button type="button" class="${d.stage === "final" ? "on" : ""}" data-stage="final">🏁 Final professional check</button></div></div>
@@ -523,7 +596,11 @@
     const bar = document.createElement("div");
     bar.id = "pvFocus";
     bar.className = "pv-focus";
-    bar.innerHTML = `<span><b>${esc(C.label(id))}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : "nothing to point at on the preview (it is judged from the whole mailer or from artwork) — see the result in the table"}</span><button type="button" data-act="clear-focus" aria-label="Clear highlight">× Show all</button>`;
+    const isBrief = id.startsWith("brief:");
+    const label = isBrief ? ($(`#checklist tr[data-item="${id}"] .cl-name b`) || {}).textContent || "Brief requirement" : C.label(id);
+    const none = isBrief ? "not found on the preview — the mailer doesn't seem to contain it (see the result in the table)"
+      : "nothing to point at on the preview (it is judged from the whole mailer or from artwork) — see the result in the table";
+    bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : none}</span><button type="button" data-act="clear-focus" aria-label="Clear highlight">× Show all</button>`;
     $(".pv-legend", pv).before(bar);
     if (scroll && hits.length) hits[0].scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -539,8 +616,9 @@
     const d = S.draft;
     const msg = $("#rfMsg");
     const items = itemsFor(ver, a.brand);
+    const bRows = briefRows(m, ver, a);
     if (!d.reviewers.length) { msg.className = "err"; msg.textContent = "Add at least one checker's name."; return; }
-    const missing = items.filter((i) => !d.decisions[i.id]);
+    const missing = items.concat(bRows).filter((i) => !d.decisions[i.id]);
     if (missing.length) {
       msg.className = "err";
       msg.textContent = `Decide ${missing.length} more item(s) first — highlighted in the table.`;
@@ -560,9 +638,16 @@
       byItem[i.id] = { decision: dec, auto: i.status, method: i.method, evidence: i.evidence, by };
       tally[dec]++; split[by]++;
     }
+    const briefItems = {}, briefTally = { pass: 0, fail: 0, na: 0 };
+    for (const r of bRows) {
+      const dec = d.decisions[r.id];
+      briefItems[r.id] = { text: r.req.text, brief: r.brief.title, priority: r.priority, auto: r.status, note: r.note,
+        decision: dec, by: dec === r.suggested ? (r.method === "ai" ? "ai" : "auto") : "human" };
+      briefTally[dec]++;
+    }
     const review = {
       id: DB.uid(), projectId: S.project.id, mailerId: m.id, v: ver.v, stage: d.stage, reviewers: [...d.reviewers],
-      notes: d.notes.trim(), verdict: d.stage === "final" ? d.verdict : null, at: now(), byItem, tally, split,
+      notes: d.notes.trim(), verdict: d.stage === "final" ? d.verdict : null, at: now(), byItem, tally, split, briefItems, briefTally,
       engineScore: ver.engine.score
     };
     await DB.put("reviews", review);
@@ -573,7 +658,8 @@
     }
     const what = d.stage === "final" ? (d.verdict === "approved" ? "Final check — approved" : "Final check — changes requested") : "Manual check";
     await logEvent({ type: "review", mailerId: m.id, v: ver.v, reviewId: review.id, by: review.reviewers.join(", "),
-      text: `${what} on “${m.name}” v${ver.v} by ${review.reviewers.join(", ")} — ${tally.pass} pass, ${tally.fail} fail` });
+      text: `${what} on “${m.name}” v${ver.v} by ${review.reviewers.join(", ")} — ${tally.pass} pass, ${tally.fail} fail` +
+        (bRows.length ? ` · brief ${briefTally.pass}/${bRows.length - briefTally.na} met` : "") });
     S.draft = { ...newDraft(S.current.key, items), reviewers: d.reviewers, stage: d.stage };
     await reloadProject(S.project.id);
     toast(`${what} saved`);
@@ -617,9 +703,8 @@
     }
   }
 
-  /* ---------- right-hand notes: what the brief asked for ---------- */
-  function notesHTML(m, ver, a) {
-    const briefs = briefsFor(m);
+  /* ---------- right-hand notes: who has worked on this mailer ---------- */
+  function notesHTML(m) {
     const reviews = S.reviews.filter((r) => r.mailerId === m.id).map((r) => `
       <li data-act="review-detail" data-id="${esc(r.id)}" tabindex="0"><span class="stage-tag ${r.stage}">${r.stage === "final" ? "Final" : "Manual"}</span>
         <b>${esc(r.reviewers.join(", "))}</b><small>v${r.v} · ${fmtDate(r.at)}${r.verdict ? " · " + (r.verdict === "approved" ? "approved" : "changes") : ""}</small></li>`).join("");
@@ -628,37 +713,7 @@
         ${m.versions.slice().reverse().map((v) => `<li><span class="stage-tag auto">Upload</span><b>${esc(v.uploadedBy)}</b><small>v${v.v} · ${fmtDate(v.uploadedAt)} · auto-checked</small></li>`).join("")}
         ${reviews}
       </ul></div>`;
-    if (!briefs.length) {
-      return `<div class="notes-card"><h3>Brief check</h3>
-        <p class="muted">No brief is linked to this mailer yet. Add one and every requirement in it is checked against this mailer here.</p>
-        <a class="btn sm" href="${P()}/briefs">+ Add a brief</a></div>${who}`;
-    }
-    const rows = B.checkAll(briefs, a.brand.text);
-    const aiRes = Object.fromEntries(((ver.briefAI && ver.briefAI.results) || []).map((x) => [x.id, x]));
-    const ICON = { found: "✓", partial: "◐", missing: "✕", verify: "👁", superseded: "⤼", conflict: "⚠" };
-    const counts = {};
-    const groups = briefs.map((b) => {
-      const list = rows.filter((x) => x.brief === b).map((x) => {
-        const ai = aiRes[x.req.id];
-        const st = ai ? ai.status : x.status;
-        counts[st] = (counts[st] || 0) + 1;
-        return `<li class="nr ${st}"><span class="ic">${ICON[st] || "•"}</span><div>
-          <div class="nr-t">${esc(x.req.text)}</div>
-          <div class="nr-n">${ai ? `✦ ${esc(ai.note)}` : esc(x.note)}</div>
-          ${x.evidence && st !== "superseded" ? `<div class="nr-e">${esc(x.evidence)}</div>` : ""}</div></li>`;
-      }).join("");
-      return `<div class="nb"><div class="nb-head"><span class="prio ${priorityOf(b) === 1 ? "top" : ""}">P${priorityOf(b)}</span>
-        <a href="${P()}/briefs/${encodeURIComponent(b.id)}">${esc(b.title)}</a><small>${b.kind === "change" ? "change brief" : "original"} · ${fmtDay(b.uploadedAt)}</small></div>
-        <ul class="nrs">${list || '<li class="muted small">No checkable requirements — add some in Briefs.</li>'}</ul></div>`;
-    }).join("");
-    const sum = ["found", "partial", "missing", "conflict", "verify", "superseded"].filter((k) => counts[k])
-      .map((k) => `<span class="ns ${k}">${ICON[k]} ${counts[k]} ${k === "verify" ? "to verify" : k}</span>`).join("");
-    return `<div class="notes-card"><h3>Brief check <small>${briefs.length} brief(s), newest first</small></h3>
-        <div class="ns-row">${sum}</div>
-        <p class="muted small">P1 is the latest brief — where briefs disagree it wins and older lines show as replaced.</p>
-        <button class="btn ghost sm ai-btn" data-act="ai-brief-check" ${aiAttr()}>✦ AI brief check</button>${aiNote()}
-        ${ver.briefAI ? `<p class="muted small">✦ AI checked ${fmtDate(ver.briefAI.at)} by ${esc(ver.briefAI.by)}</p>` : ""}
-        ${groups}</div>${who}`;
+    return who;
   }
 
   async function runAIBriefCheck(btn) {
@@ -961,6 +1016,10 @@
         <dt>Decided by</dt><dd>${r.split.auto} automated · ${r.split.ai} AI · ${r.split.human} by the reviewer</dd>
         ${r.notes ? `<dt>Notes</dt><dd class="pre">${esc(r.notes)}</dd>` : ""}</dl>
         <div class="table-wrap"><table class="tbl small"><thead><tr><th>Check</th><th>Automated said</th><th>Decision</th><th>Decided by</th></tr></thead><tbody>${rows}</tbody></table></div>
+        ${r.briefItems && Object.keys(r.briefItems).length ? `<h4 class="bd-h">Brief check — ${r.briefTally.pass} met · ${r.briefTally.fail} not met · ${r.briefTally.na} n/a</h4>
+          <div class="table-wrap"><table class="tbl small"><thead><tr><th>Requirement</th><th>Brief</th><th>Automated said</th><th>Decision</th><th>Decided by</th></tr></thead><tbody>
+          ${Object.values(r.briefItems).map((x) => `<tr class="${x.decision}"><td>${esc(x.text)}</td><td>P${x.priority} ${esc(x.brief)}</td><td>${esc(x.auto)}</td><td><b>${esc(x.decision)}</b></td><td>${by[x.by]}</td></tr>`).join("")}
+          </tbody></table></div>` : ""}
         ${m ? `<p><a class="btn sm" data-href="${P()}/upload/${encodeURIComponent(m.id)}/v${r.v}" href="${P()}/upload/${encodeURIComponent(m.id)}/v${r.v}">Open this version</a></p>` : ""}`
     });
   }
@@ -1096,8 +1155,9 @@
       $$("[data-dec]", tr).forEach((b) => { const on = b.dataset.dec === v; b.className = on ? "on " + v : ""; b.setAttribute("aria-pressed", on); });
       const pre = $(".pre", tr);
       if (pre) pre.remove();
-      const prog = $("#checklist .sp.prog");
-      if (prog) prog.textContent = `${Object.keys(S.draft.decisions).length}/${$$("#checklist tbody tr").length} decided`;
+      const card = tr.closest(".card"), prog = card && $(".sp.prog", card);
+      const rowsHere = card ? $$("tbody tr", card) : [];
+      if (prog) prog.textContent = `${rowsHere.filter((x) => S.draft.decisions[x.dataset.item]).length}/${rowsHere.length} decided`;
       return;
     }
     const stage = e.target.closest("[data-stage]");

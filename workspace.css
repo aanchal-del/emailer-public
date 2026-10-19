@@ -378,3 +378,14 @@ select { font: inherit; font-size: 13.5px; padding: 7px 9px; border: 1px solid #
 }
 .req-add .link { font-size: 13px; }
 .ai-badge.store { background: var(--pass-bg); color: var(--pass); border-color: #bfe3d1; }
+
+/* brief check table (same layout as the brand checklist) */
+.brief-check .cl-name small { display: flex; gap: 5px; align-items: center; }
+.ev.quote { color: var(--muted); font-style: italic; }
+.cl-table tr.replaced td { opacity: .55; }
+.cl-table tr.replaced .cl-name b { text-decoration: line-through; }
+.sp.b-pass { background: var(--pass-bg); color: var(--pass); }
+.sp.b-warn { background: var(--warn-bg); color: var(--warn); }
+.sp.b-fail { background: var(--fail-bg); color: var(--fail); }
+.sp.b-review { background: #f0eef4; color: #6d5aa8; }
+.sp.b-na { background: #f1f4f8; color: var(--muted); }

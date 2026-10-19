@@ -641,9 +641,21 @@ window.BrandChecks = (() => {
     // 26. Mobile — straight from the handbook measurements
     set("mobile", r.counts.fail ? "warn" : "pass", r.counts.fail ? `${r.counts.fail} handbook error(s) — handbook score ${r.score}%. See the findings below.` : `No handbook errors — handbook score ${r.score}%.`);
 
+    // Where a pattern sits on the page — used to point brief requirements at the preview.
+    const locate = (re, max) => {
+      const hits = [];
+      for (const m of joined.matchAll(re)) {
+        const i = lineAt(m.index), s = m.index - starts[i];
+        const rect = rectFor(lines[i], s, Math.min(lines[i].text.length, s + m[0].length));
+        if (rect) hits.push({ page: lines[i].page, rect });
+        if (hits.length >= (max || 3)) break;
+      }
+      return hits;
+    };
+
     return {
       items: ITEMS.map((it) => ({ id: it.id, ...out[it.id] })),
-      marks, text: lines.map((l) => l.text).join("\n")
+      marks, text: lines.map((l) => l.text).join("\n"), locate
     };
   }
 

@@ -501,5 +501,20 @@ window.BriefReader = (() => {
       : { ...row, ...check(row.req, m) });
   }
 
-  return { ACCEPT, kindOf, read, briefText, summarize, extractRequirements, checkAll, normalise, pickSheets };
+  // Patterns that find where a requirement shows up in the mailer, for preview boxes.
+  function needles(req) {
+    const rx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (req.kind === "cta") {
+      const want = req.text.replace(/^cta[^:]*:\s*/i, "").trim();
+      return want ? [new RegExp(rx(want).replace(/\s+/g, "\\s+"), "gi")] : [];
+    }
+    if (req.kind === "date") return datesOf(req.text).map((d) => new RegExp(`\\b0?${d.day}(st|nd|rd|th)?\\s+${d.mon}[a-z]*`, "gi"));
+    if (req.kind === "flag") return /personal/i.test(req.field) ? [/\bDear\b/g] : [/terms\s+(and|&)\s+conditions|t\s*&\s*cs?\b/gi];
+    const nums = numbersOf(req.text);
+    if (nums.length) return nums.map((n) => new RegExp(`(?<![\\d,])${n.replace(/[%x]$/, "").split("").join(",?")}(?!,?\\d)` +
+      (/x$/.test(n) ? "\\s?x" : /%$/.test(n) ? "\\s?%" : ""), "gi"));
+    return [...new Set(tokensOf(req.text))].slice(0, 3).map((t) => new RegExp(`\\b${rx(t)}\\w*`, "gi"));
+  }
+
+  return { ACCEPT, kindOf, read, briefText, summarize, extractRequirements, checkAll, normalise, pickSheets, needles };
 })();
