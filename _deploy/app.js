@@ -1084,6 +1084,7 @@
 
     reportEl.innerHTML = `
       ${banner}
+      ${opts.compact ? "" : `
       <div class="score-card">
         <div class="gauge">
           <svg width="128" height="128" viewBox="0 0 128 128">
@@ -1111,6 +1112,7 @@
           </p>
         </div>
       </div>
+      `}
 
       ${opts.slot ? '<div class="review-split"><div class="report-slot"></div><div class="pv-side">' : ""}
       <h3 class="section-title">Preview — what was detected</h3>
@@ -1132,12 +1134,18 @@
         <div class="pv-pages" id="pvPages"><span class="pv-loading"><span class="spinner"></span>Rendering pages…</span></div>
       </div>
       ${opts.slot ? '</div></div>' : ""}
+      ${opts.compact ? `<details class="card hb-details">
+        <summary><span>Handbook measurements</span><small>${r.counts.pass} passed · ${r.counts.warn} to fix · ${r.counts.fail} failed — mobile handbook score ${r.score}%</small></summary>
+        ${sortChecks(r.scored).map(renderCheck).join("") || '<p class="empty">No scorable checks for this file.</p>'}
+        ${r.obs.length ? `<h4 class="section-title">Observations — heuristic, review by eye</h4>${sortChecks(r.obs).map(renderCheck).join("")}` : ""}
+      </details>` : `
       <h3 class="section-title">Scored findings</h3>
       ${sortChecks(r.scored).map(renderCheck).join("") || '<p class="empty">No scorable checks for this file.</p>'}
 
       ${r.obs.length ? `<h3 class="section-title">Observations — heuristic, review by eye</h3>
         ${sortChecks(r.obs).map(renderCheck).join("")}` : ""}
-
+      `}
+      ${opts.compact ? "" : `
       <h3 class="section-title">Manual review — not machine-checkable from a PDF</h3>
       <div class="check info">
         <div class="check-head"><span class="check-badge">manual</span>
@@ -1157,20 +1165,21 @@
         <button class="btn" id="printBtn">Save / print report</button>
         ${opts.onAgain ? '<button class="btn ghost" id="againBtn">Check another PDF</button>' : ""}
       </div>
+      `}
     `;
     const q = (s) => reportEl.querySelector(s);
     reportEl.hidden = false;
-    requestAnimationFrame(() => { q(".bar").style.strokeDashoffset = offset; });
+    if (q(".bar")) requestAnimationFrame(() => { q(".bar").style.strokeDashoffset = offset; });
     if (opts.scroll) reportEl.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    q("#diagCopy").addEventListener("click", (e) => {
+    if (q("#diagCopy")) q("#diagCopy").addEventListener("click", (e) => {
       navigator.clipboard.writeText(q("#diagText").textContent).then(() => {
         e.target.textContent = "Copied ✓";
         setTimeout(() => { e.target.textContent = "Copy diagnostics"; }, 1500);
       }).catch(() => { e.target.textContent = "Select the text below and copy"; });
     });
 
-    q("#printBtn").addEventListener("click", () => window.print());
+    if (q("#printBtn")) q("#printBtn").addEventListener("click", () => window.print());
     if (opts.onAgain) q("#againBtn").addEventListener("click", opts.onAgain);
 
     const preview = q("#preview");
@@ -1180,7 +1189,7 @@
         btn.classList.toggle("off", off);
       });
     });
-    const rendered = renderPreview(q("#pvPages"), r.pdf, r.marks).catch((err) => {
+    const rendered = renderPreview(q("#pvPages"), r.pdf, r.marks, opts.previewMax).catch((err) => {
       console.error(err);
       q("#pvPages").innerHTML = '<p class="empty">Could not render a preview of this PDF.</p>';
     });
@@ -1333,8 +1342,9 @@
   }
 
   /* ---------- page preview with detection overlay ---------- */
-  async function renderPreview(container, pdf, marks) {
-    const maxW = Math.min(container.clientWidth || 560, 560);
+  async function renderPreview(container, pdf, marks, cap) {
+    cap = cap || 560;
+    const maxW = Math.min(container.clientWidth || cap, cap);
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const frag = document.createDocumentFragment();
 

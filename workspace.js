@@ -6,6 +6,18 @@
   const $ = (s, el) => (el || document).querySelector(s);
   const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
   const esc = (s) => E.escapeHtml(s == null ? "" : s);
+  // One stroke icon set at one size, so every icon centres on its text the same way.
+  const ICONS = {
+    plus: "M12 5v14M5 12h14", upload: "M12 15V4M7.5 8.5 12 4l4.5 4.5M4 20h16", download: "M12 4v11M7.5 10.5 12 15l4.5-4.5M4 20h16",
+    book: "M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5zM5 19.5A1.5 1.5 0 0 0 6.5 21H19",
+    trash: "M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5", user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20.5c.8-3.6 3.8-5.5 7.5-5.5s6.7 1.9 7.5 5.5",
+    users: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.6-3.2 3.1-5 6.5-5s5.9 1.8 6.5 5M16 4.3a3.5 3.5 0 0 1 0 6.4M18 15.4c1.9.6 3.1 2.2 3.5 4.6",
+    laptop: "M5 5h14v10H5zM3 19h18", flag: "M5 21V4M5 4h12l-2.5 4L17 12H5", check: "m5 12.5 4.5 4.5L19 7", x: "M6 6l12 12M18 6 6 18",
+    minus: "M5 12h14", chevron: "m9 6 6 6-6 6", undo: "M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11", file: "M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8zM14 3v5h5",
+    clip: "m20 11.5-8.2 8.2a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6",
+    chart: "M5 20V11M12 20V5M19 20v-8M3 20h18", pencil: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z", back: "m15 6-6 6 6 6", sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"
+  };
+  const icon = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${ICONS[n]}"/></svg>`;
   const app = $("#app");
 
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
@@ -42,7 +54,7 @@
     return new Promise((resolve) => {
       const m = $("#modal");
       m.innerHTML = `<div class="modal-box ${wide ? "wide" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
-        <div class="modal-head"><h3>${esc(title)}</h3><button class="modal-x" data-mclose aria-label="Close">×</button></div>
+        <div class="modal-head"><h3>${esc(title)}</h3><button class="modal-x" data-mclose aria-label="Close">${icon("x")}</button></div>
         <div class="modal-body">${body}</div>
         <div class="modal-foot">${actions.map((a, i) => `<button class="btn ${a.primary ? "" : "ghost"} ${a.danger ? "danger" : ""}" data-mval="${i}">${esc(a.label)}</button>`).join("")}</div>
       </div>`;
@@ -92,8 +104,6 @@
     if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
     return json;
   }
-  const aiAttr = () => S.ai.available ? "" : `disabled title="${esc(S.ai.reason)}"`;
-  const aiNote = () => S.ai.available ? "" : `<span class="ai-off-note">AI is off — ${esc(S.ai.reason)}</span>`;
 
   async function downloadFile(fileId, name) {
     const f = await DB.file(fileId);
@@ -202,12 +212,13 @@
 
   /* ---------- top bar ---------- */
   function renderUserChip() {
-    $("#userBtn").innerHTML = S.user ? `👤 ${esc(S.user)}` : "👤 Set your name";
+    $("#userBtn").innerHTML = `${icon("user")}<span>${S.user ? esc(S.user) : "Set your name"}</span>`;
   }
   function renderAIBadge() {
     const b = $("#aiBadge");
-    b.className = "ai-badge " + (S.ai.available ? "on" : "off");
-    b.textContent = S.ai.available ? `✦ AI on` : "✦ AI off";
+    b.className = "ai-badge on";
+    b.hidden = !S.ai.available;                 // nothing to say when AI isn't set up
+    b.innerHTML = `${icon("sparkle")}<span>AI on</span>`;
     b.title = S.ai.available ? `AI features use ${S.ai.model}` : S.ai.reason;
   }
   function crumbs(parts) {
@@ -223,7 +234,7 @@
     const cards = S.projects.map((p) => {
       return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/upload" tabindex="0">
         <div class="pc-top"><h3>${esc(p.name)}</h3>
-          <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">🗑</button></div>
+          <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">${icon("trash")}</button></div>
         <div class="pc-stats">
           <div><b>${count("mailers", p.id)}</b><span>Mailers</span></div>
           <div><b>${count("briefs", p.id)}</b><span>Briefs</span></div>
@@ -238,7 +249,7 @@
         <div><h1>Projects</h1><p class="muted">One project per client or campaign. Each holds its mailers, briefs and every check made on them.</p></div>
         <form class="inline-form" data-form="new-project">
           <input class="inp" name="name" placeholder="New project name, e.g. Plat Reserve Upgrade Sep '26" required maxlength="80">
-          <button class="btn">+ Create project</button>
+          <button class="btn">${icon("plus")}<span>Create project</span></button>
         </form>
       </div>
       ${S.projects.length ? `<div class="proj-grid">${cards}</div>` :
@@ -255,8 +266,8 @@
       </div>`;
     }
     renderSide(rt);
-    const tabs = [["upload", "📤 Upload & Analyse"], ["briefs", `📋 Briefs (${S.briefs.length})`], ["history", "📊 History"], ["rulebook", "📘 Rulebook"]];
-    $("#tabs").innerHTML = tabs.map(([k, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${l}</a>`).join("");
+    const tabs = [["upload", "upload", "Upload & Analyse"], ["briefs", "file", `Briefs <span class="tab-n">${S.briefs.length}</span>`], ["history", "chart", "History"], ["rulebook", "book", "Rulebook"]];
+    $("#tabs").innerHTML = tabs.map(([k, ic, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${icon(ic)}<span>${l}</span></a>`).join("");
     const parts = [{ label: "Projects", href: "#/" }, { label: S.project.name, href: P() + "/upload" }];
     const tabName = { upload: "Upload & Analyse", briefs: "Briefs", history: "History", rulebook: "Rulebook" }[rt.tab];
     parts.push({ label: tabName, href: `${P()}/${rt.tab}` });
@@ -269,35 +280,23 @@
     rt = rt || parseRoute();
     const mailers = S.mailers.map((m) => {
       const st = mailerStatus(m);
+      const pct = storedCompliance(m, st.ver);
       const active = rt.tab === "upload" && rt.id === m.id;
       return `<li class="side-item ${active ? "on" : ""}" data-href="${P()}/upload/${encodeURIComponent(m.id)}" tabindex="0">
         <div class="si-name"><span>${esc(m.name)}</span><span class="si-v">v${st.ver.v}</span></div>
-        <div class="si-meta">
-          <span class="chip ${st.ver.engine.score >= 85 ? "good" : st.ver.engine.score >= 65 ? "ok" : "bad"}">${st.ver.engine.score}%</span>
-          <span class="stage done" title="Automated checks ran on upload">✓ Auto</span>
-          ${st.ver.aiBrand ? '<span class="stage done ai" title="AI checked the remaining items">✦ AI</span>' : ""}
-        </div>
-        <div class="si-people">${st.manualNames.length ? `👤 Manual: ${esc(st.manualNames.join(", "))}` : '<span class="pending">👤 Manual check pending</span>'}</div>
-        <div class="si-people">${st.final ? (st.approved ? `🏁 Final ✓ ${esc(st.final.reviewers.join(", "))}` : `<span class="bad-t">🏁 Changes asked by ${esc(st.final.reviewers.join(", "))}</span>`) : '<span class="pending">🏁 Final check pending</span>'}</div>
+        <div class="si-line"><span class="chip ${scoreCls(pct)}">${pct}%</span><span class="si-st ${st.manual.length ? "done" : "todo"}">${icon("user")}${st.manual.length ? esc(st.manualNames.join(", ")) : "Manual pending"}</span></div>
+        <div class="si-line"><span class="si-st ${st.final ? (st.approved ? "done" : "bad") : "todo"}">${icon("flag")}${st.final ? (st.approved ? `Final: ${esc(st.final.reviewers.join(", "))}` : `Changes asked: ${esc(st.final.reviewers.join(", "))}`) : "Final pending"}</span></div>
       </li>`;
     }).join("");
-    const briefs = S.briefs.map((b) => {
-      const scope = b.mailerId ? (S.mailers.find((m) => m.id === b.mailerId) || {}).name || "a deleted mailer" : "All mailers";
-      return `<li class="side-item small ${rt.tab === "briefs" && rt.id === b.id ? "on" : ""}" data-href="${P()}/briefs/${encodeURIComponent(b.id)}" tabindex="0">
-        <div class="si-name"><span><span class="prio ${priorityOf(b) === 1 ? "top" : ""}">P${priorityOf(b)}</span> ${esc(b.title)}</span></div>
-        <div class="si-people">${b.kind === "change" ? "Change brief" : "Original"} · ${esc(scope)} · ${fmtDay(b.uploadedAt)}</div>
-      </li>`;
-    }).join("");
-    const acts = S.events.slice(0, 6).map((e) => `<li class="act" data-act="event-detail" data-id="${esc(e.id)}" tabindex="0"><span>${esc(e.text)}</span><small>${esc(e.by || "")} · ${fmtDate(e.at)}</small></li>`).join("");
+    const briefOpts = S.briefs.map((b) => `<option value="${esc(b.id)}" ${rt.tab === "briefs" && rt.id === b.id ? "selected" : ""}>P${priorityOf(b)} · ${esc(b.title)}</option>`).join("");
     $("#side").innerHTML = `
-      <div class="side-proj"><a href="#/" class="back">← All projects</a><h2>${esc(S.project.name)}</h2></div>
-      <a class="btn side-cta" href="${P()}/upload">+ Upload mailer</a>
-      <h3 class="side-h">Mailers <span>${S.mailers.length}</span></h3>
+      <div class="side-proj"><a href="#/" class="back">${icon("back")}<span>All projects</span></a><h2>${esc(S.project.name)}</h2></div>
+      <a class="btn side-cta" href="${P()}/upload">${icon("plus")}<span>Upload mailer</span></a>
+      <h3 class="side-h"><span>Mailers</span><span>${S.mailers.length}</span></h3>
       <ul class="side-list">${mailers || '<li class="side-empty">No mailers yet</li>'}</ul>
-      <h3 class="side-h">Briefs <span title="P1 is the newest brief and overrides older ones">priority ↓</span></h3>
-      <ul class="side-list">${briefs || `<li class="side-empty">No briefs yet · <a href="${P()}/briefs">add one</a></li>`}</ul>
-      <h3 class="side-h">Recent activity</h3>
-      <ul class="side-acts">${acts || '<li class="side-empty">Nothing yet</li>'}</ul>`;
+      <h3 class="side-h"><span>Briefs</span><span>${S.briefs.length}</span></h3>
+      ${S.briefs.length ? `<select class="side-select" data-change="jump-brief" aria-label="Open a brief"><option value="">Open a brief (P1 = newest)…</option>${briefOpts}</select>`
+        : `<a class="side-empty link" href="${P()}/briefs">${icon("plus")}<span>Add a brief</span></a>`}`;
   }
 
   /* ---------- upload tab ---------- */
@@ -307,17 +306,17 @@
       const st = mailerStatus(m);
       return `<article class="mailer-card" data-href="${P()}/upload/${encodeURIComponent(m.id)}" tabindex="0">
         <h4>${esc(m.name)} <span class="si-v">v${st.ver.v}</span></h4>
-        <div class="mc-score">${st.ver.engine.score}% <small>handbook</small></div>
+        <div class="mc-score ${scoreCls(storedCompliance(m, st.ver))}">${storedCompliance(m, st.ver)}% <small>compliance</small></div>
         <div class="muted small">${st.ver.engine.counts.fail} errors · ${st.ver.engine.counts.warn} to fix · uploaded by ${esc(st.ver.uploadedBy)} · ${fmtDay(st.ver.uploadedAt)}</div>
         <div class="muted small">${st.manualNames.length ? "Manual: " + esc(st.manualNames.join(", ")) : "Manual check pending"} · ${st.approved ? "Final ✓" : "Final pending"}</div>
       </article>`;
     }).join("");
     view.innerHTML = `
       <div class="card upload-card">
-        <div class="uc-head"><h2>Upload a mailer PDF</h2><a href="${P()}/rulebook" class="link">View rulebook →</a></div>
+        <div class="uc-head"><h2>Upload a mailer PDF</h2><a href="${P()}/rulebook" class="link">${icon("book")}<span>View rulebook</span></a></div>
         <label class="ws-drop" data-drop="mailer">
           <input type="file" accept="application/pdf,.pdf" class="vh">
-          <span class="drop-icon">⬆</span>
+          <span class="drop-icon">${icon("upload")}</span>
           <span class="drop-title">Drop the mailer PDF here or <u>browse</u></span>
           <span class="drop-hint">The full handbook engine, the Amex brand & copy checklist and the brief checks run in your browser the moment it lands.</span>
         </label>
@@ -350,6 +349,7 @@
         brand: { items: brand.items }, aiBrand: null, vision: null, briefAI: null
       };
       m.versions.push(ver);
+      ver.compliance = compliance(m, ver, { r, brand }).pct;
       await DB.put("mailers", m);
       cache.set(`${m.id}:${v}`, { r, file, brand: { [m.type]: brand } });
       const auto = brand.items.filter((i) => i.method === "auto" && DECIDED.includes(i.status)).length;
@@ -390,12 +390,48 @@
   }
   const briefSig = (m) => briefsFor(m).map((b) => b.id + "." + (b.requirements || []).length).join(",");
 
-  function newDraft(key, items) {
-    const decisions = {};
-    for (const i of items) if (DECIDED.includes(i.status)) decisions[i.id] = i.status;
-    const keep = S.draft && S.draft.key && S.draft.key.split(":")[0] === key.split(":")[0] ? S.draft : null;
-    return { key, decisions, touched: {}, reviewers: keep ? keep.reviewers : uniq([S.user]), stage: keep ? keep.stage : "manual", notes: "", verdict: "approved" };
+  // The latest decision on every item of this version, with who made it and why —
+  // the next reviewer starts from exactly this.
+  function lastDecisions(m, ver) {
+    const out = {};
+    const revs = S.reviews.filter((r) => r.mailerId === m.id && r.v === ver.v).slice().sort((a, z) => a.at.localeCompare(z.at));
+    for (const r of revs) {
+      for (const [id, x] of Object.entries(Object.assign({}, r.byItem, r.briefItems)))
+        out[id] = { decision: x.decision, reason: x.reason || "", who: x.who || r.reviewers.join(", "), at: x.at || r.at, by: x.by };
+    }
+    return out;
   }
+
+  function newDraft(key, m, ver, a) {
+    const last = lastDecisions(m, ver);
+    const decisions = {}, reasons = {};
+    const seed = (id, auto) => {
+      if (last[id]) { decisions[id] = last[id].decision; reasons[id] = last[id].reason; }
+      else if (auto) decisions[id] = auto;
+    };
+    for (const i of itemsFor(ver, a.brand)) seed(i.id, DECIDED.includes(i.status) ? i.status : null);
+    for (const r of briefRows(m, ver, a)) seed(r.id, r.suggested);
+    const keep = S.draft && S.draft.key === key ? S.draft : null;
+    return { key, decisions, reasons, touched: {}, last, reviewers: keep ? keep.reviewers : uniq([S.user]),
+             stage: keep ? keep.stage : "manual", notes: "", verdict: "approved" };
+  }
+
+  // Share of checks that pass on the latest decisions (N/A left out). 100% once the final
+  // professional check approves the version.
+  function compliance(m, ver, a) {
+    const st = mailerStatus(m, ver);
+    if (st.approved) return { pct: 100, note: `Final check approved by ${st.final.reviewers.join(", ")}` };
+    const last = lastDecisions(m, ver);
+    let pass = 0, total = 0;
+    const count = (id, auto) => { const d = last[id] ? last[id].decision : auto; if (d === "na") return; total++; if (d === "pass") pass++; };
+    for (const i of (a ? itemsFor(ver, a.brand) : ver.brand.items)) count(i.id, DECIDED.includes(i.status) ? i.status : null);
+    if (a) for (const r of briefRows(m, ver, a)) count(r.id, r.suggested);
+    const lastRev = st.revs[0];
+    return { pct: total ? Math.round((pass / total) * 100) : 0,
+             note: lastRev ? `After the ${lastRev.stage === "final" ? "final" : "manual"} check by ${lastRev.reviewers.join(", ")}` : "Automated checks only — no manual check yet" };
+  }
+  const storedCompliance = (m, ver) => (ver.compliance != null ? ver.compliance : compliance(m, ver).pct);
+  const scoreCls = (p) => (p >= 85 ? "good" : p >= 65 ? "ok" : "bad");
 
   async function renderMailer(view, rt, seq) {
     const m = S.mailers.find((x) => x.id === rt.id);
@@ -409,14 +445,10 @@
       return refreshMailer();
     }
     view.dataset.mounted = mkey;
-    view.innerHTML = `<div id="mhead"></div><div id="pipe"></div>
-      <div class="mailer-body">
-        <div class="mailer-main"><div class="status" id="mStatus">${spinner}Analysing ${esc(ver.fileName)}…</div><div id="report" class="report" hidden></div></div>
-        <aside class="mailer-notes" id="notes"></aside>
-      </div>`;
+    view.innerHTML = `<div id="mhead"></div>
+      <div class="status" id="mStatus">${spinner}Analysing ${esc(ver.fileName)}…</div><div id="report" class="report" hidden></div>`;
     S.current = { m, ver, key, a: null };
-    $("#mhead").innerHTML = mailerHeadHTML(m, ver);
-    $("#pipe").innerHTML = pipelineHTML(m, ver);
+    $("#mhead").innerHTML = mailerHeadHTML(m, ver, null);
     let a;
     try { a = await analysisFor(m, ver); }
     catch (err) {
@@ -425,10 +457,10 @@
     }
     if (seq !== renderSeq || view.dataset.mounted !== mkey) return;
     S.current.a = a;
-    if (!S.draft || S.draft.key !== key) S.draft = newDraft(key, itemsFor(ver, a.brand));
+    if (!S.draft || S.draft.key !== key) S.draft = newDraft(key, m, ver, a);
     $("#mStatus").remove();
     const r = { ...a.r, marks: a.r.marks.concat(a.brand.marks, briefMarks(briefRows(m, ver, a), a.brand)) };
-    E.renderReport(r, a.file, $("#report"), { slot: true, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
+    E.renderReport(r, a.file, $("#report"), { slot: true, compact: true, previewMax: 760, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
     $("#report .report-slot").innerHTML = '<div id="checklist"></div>';
     S.focusItem = null;
     refreshMailer();
@@ -436,171 +468,207 @@
 
   function refreshMailer() {
     const { m, ver, a } = S.current;
-    $("#mhead").innerHTML = mailerHeadHTML(m, ver);
-    $("#pipe").innerHTML = pipelineHTML(m, ver);
+    $("#mhead").innerHTML = mailerHeadHTML(m, ver, a);
     if (!a) return;
     renderChecklist();
-    $("#notes").innerHTML = notesHTML(m, ver, a);
+    // Briefs added or changed since the last check move the score; keep the saved copy
+    // (shown in the sidebar and on cards) the same as the one on screen.
+    const pct = compliance(m, ver, a).pct;
+    if (ver.compliance !== pct) {
+      const mm = S.mailers.find((x) => x.id === m.id), vv = mm && mm.versions.find((x) => x.v === ver.v);
+      if (vv) { vv.compliance = pct; DB.put("mailers", mm).then(() => renderSide()).catch(() => {}); }
+    }
   }
 
-  function mailerHeadHTML(m, ver) {
+  function mailerHeadHTML(m, ver, a) {
     const vopts = m.versions.map((x) => `<option value="${x.v}" ${x.v === ver.v ? "selected" : ""}>v${x.v} · ${fmtDay(x.uploadedAt)}${m.final && m.final.v === x.v ? " · final ✓" : ""}</option>`).join("");
+    const st = mailerStatus(m, ver);
+    const c = a ? compliance(m, ver, a) : { pct: storedCompliance(m, ver), note: "" };
     return `<div class="card mailer-head">
       <div class="mh-left">
         <h2>${esc(m.name)}</h2>
         <div class="mh-meta">${esc(ver.fileName)} · ${E.fmtBytes(ver.size)} · ${ver.engine.pages} page(s) · uploaded by <b>${esc(ver.uploadedBy)}</b> ${fmtDate(ver.uploadedAt)}</div>
+        <div class="mh-status">
+          <span class="st ${st.manual.length ? "done" : "todo"}">${icon("user")}${st.manual.length ? `Manual check: ${esc(st.manualNames.join(", "))}` : "Manual check pending"}</span>
+          <span class="st ${st.final ? (st.approved ? "done" : "bad") : "todo"}">${icon("flag")}${st.final ? (st.approved ? `Final approved: ${esc(st.final.reviewers.join(", "))}` : `Changes asked: ${esc(st.final.reviewers.join(", "))}`) : "Final check pending"}</span>
+          ${st.approved ? `<button class="link" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">${icon("download")}Download final emailer</button>` : ""}
+        </div>
       </div>
+      <div class="mh-score ${scoreCls(c.pct)}" title="${esc(c.note)}"><b>${c.pct}%</b><span>Compliance</span></div>
       <div class="mh-actions">
         <label class="mini">Type <select data-change="mailer-type"><option value="marketing" ${m.type === "marketing" ? "selected" : ""}>Marketing</option><option value="servicing" ${m.type === "servicing" ? "selected" : ""}>Servicing</option></select></label>
         <label class="mini">Version <select data-change="mailer-version">${vopts}</select></label>
-        <label class="btn ghost sm" data-drop="version" data-mid="${esc(m.id)}">⬆ New version<input type="file" accept="application/pdf,.pdf" class="vh"></label>
-        <button class="btn ghost sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">⬇ PDF</button>
-        <a class="btn ghost sm" href="${P()}/rulebook">📘 Rulebook</a>
-        <button class="icon-btn" data-act="delete-mailer" data-id="${esc(m.id)}" title="Delete mailer" aria-label="Delete mailer">🗑</button>
+        <span class="mh-spacer"></span>
+        <label class="btn ghost sm" data-drop="version" data-mid="${esc(m.id)}">${icon("upload")}New version<input type="file" accept="application/pdf,.pdf" class="vh"></label>
+        <button class="btn ghost sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">${icon("download")}PDF</button>
+        <a class="btn ghost sm" href="${P()}/rulebook">${icon("book")}Rulebook</a>
+        <button class="btn ghost sm icon-only danger-ghost" data-act="delete-mailer" data-id="${esc(m.id)}" title="Delete mailer" aria-label="Delete mailer">${icon("trash")}</button>
       </div>
       <div id="mhStatus"></div>
     </div>`;
   }
 
-  function pipelineHTML(m, ver) {
-    const st = mailerStatus(m, ver);
-    const items = ver.brand.items;
-    const auto = items.filter((i) => i.method === "auto" && DECIDED.includes(i.status)).length;
-    const ai = items.filter((i) => i.method === "ai" && DECIDED.includes(i.status)).length;
-    const step = (n, cls, title, body) => `<div class="pstep ${cls}"><span class="pnum">${n}</span><div><b>${title}</b><small>${body}</small></div></div>`;
-    return `<div class="pipeline">
-      ${step("1", "done", "Automated + AI check", `Handbook ${ver.engine.score}% · ${auto} auto${ai ? ` · ${ai} AI` : ""} of ${items.length} brand items`)}
-      ${step("2", st.manual.length ? "done" : "todo", "Manual check", st.manual.length ? `by ${esc(st.manualNames.join(", "))}` : "pending — use the checklist below")}
-      ${step("3", st.final ? (st.approved ? "done" : "bad") : "todo", "Final professional check", st.final ? `${st.approved ? "approved" : "changes requested"} by ${esc(st.final.reviewers.join(", "))}` : "pending")}
-      ${step("4", st.approved ? "done" : "todo", "Final emailer", st.approved ? `<button class="link" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">⬇ Download v${ver.v}</button>` : "available after final approval")}
+  /* ---------- checklist: one line per check, in mailer order (top → footer) ---------- */
+  const BRAND_BADGE = { pass: ["pass", "Pass"], fail: ["fail", "Fail"], warn: ["warn", "Check"], review: ["review", "Needs eyes"], na: ["na", "N/A"] };
+  const BRIEF_BADGE = { found: ["pass", "Found"], partial: ["warn", "Partial"], missing: ["fail", "Missing"], conflict: ["fail", "Conflict"],
+                        verify: ["review", "Verify"], superseded: ["na", "Replaced"] };
+  const REGIONS = [["top", "Top — pre-header & header"], ["body", "Body"], ["footer", "Footer"], ["whole", "Whole mailer"]];
+
+  // Where each item first appears on the mailer, as a distance from the top of page 1.
+  function placer(a, marks) {
+    const d = a.r.data, sizes = d.pageSizes || {};
+    const off = {};
+    let acc = 0;
+    for (let p = 1; p <= d.numPages; p++) { off[p] = acc; acc += (sizes[p] || { h: d.page1H }).h; }
+    const yOf = (mk) => off[mk.page] + (mk.space === "pdf" ? (sizes[mk.page] || { h: d.page1H }).h - mk.rect[3] : mk.rect[1]);
+    const first = (re) => { const h = a.brand.locate(re, 1)[0]; return h ? yOf({ ...h, space: "pdf" }) : null; };
+    const topEnd = first(/\bDear\b/g) ?? acc * 0.06;
+    const footStart = first(/get more from american express|you are receiving this|india'?s most trusted credit card brand/gi) ?? acc * 0.86;
+    const byItem = {};
+    for (const mk of marks) if (mk.item) { const y = yOf(mk); if (byItem[mk.item] == null || y < byItem[mk.item]) byItem[mk.item] = y; }
+    return (id) => {
+      const y = byItem[id];
+      if (y == null) return { y: Infinity, region: "whole" };
+      return { y, region: y < topEnd ? "top" : y >= footStart ? "footer" : "body" };
+    };
+  }
+
+  const segHTML = (dec) => ["pass", "fail", "na"].map((v) =>
+    `<button type="button" class="${dec === v ? "on " + v : ""}" data-dec="${v}" aria-pressed="${dec === v}">${icon(v === "pass" ? "check" : v === "fail" ? "x" : "minus")}${{ pass: "Pass", fail: "Fail", na: "N/A" }[v]}</button>`).join("");
+
+  function rowHTML(row) {
+    const d = S.draft, dec = d.decisions[row.id], touched = d.touched[row.id];
+    const last = d.last[row.id] && d.last[row.id].by === "human" ? d.last[row.id] : null;   // only a person's call is worth repeating
+    const reason = (d.reasons[row.id] || "").trim();
+    const needWhy = touched && (dec === "pass" || dec === "fail");
+    const word = { pass: "Pass", fail: "Fail", na: "N/A" };
+    return `<div class="cl-row${dec ? "" : " undecided"}${S.focusItem === row.id ? " focus" : ""}${row.replaced ? " replaced" : ""}${needWhy && !reason && d.showErrors ? " need" : ""}" data-item="${esc(row.id)}">
+      <button type="button" class="cl-name" title="Show on the preview"><span class="cl-title">${esc(row.title)}</span><span class="cl-sub">${row.sub}</span></button>
+      <span class="badge ${row.cls}">${row.word}</span>
+      <div class="seg" role="group" aria-label="Decision">${segHTML(dec)}</div>
+      <div class="cl-detail">
+        <div class="ev">${esc(row.evidence)}</div>
+        ${row.quote ? `<div class="ev quote">${esc(row.quote)}</div>` : ""}
+        ${last ? `<div class="cl-last ${last.decision}">${icon(last.decision === "pass" ? "check" : last.decision === "fail" ? "x" : "minus")}<span><b>${word[last.decision]}</b> by ${esc(last.who)} · ${fmtDate(last.at)}${last.reason ? ` — “${esc(last.reason)}”` : ""}</span></div>` : ""}
+        ${touched && dec ? `<label class="cl-why${needWhy && !reason && d.showErrors ? " need" : ""}"><span>Why ${word[dec].toLowerCase()}?${needWhy ? ' <i>*</i>' : ""}</span>
+          <input class="inp sm" data-reason="${esc(row.id)}" value="${esc(d.reasons[row.id] || "")}" maxlength="240"
+            placeholder="${dec === "fail" ? "What is wrong, and where" : dec === "pass" ? "What you checked" : "Why it doesn't apply"}"></label>` : ""}
+      </div>
     </div>`;
   }
 
-  /* ---------- checklist + review form (sits right under the preview) ---------- */
+  function checklistRows() {
+    const { m, ver, a } = S.current;
+    const items = itemsFor(ver, a.brand);
+    const bRows = briefRows(m, ver, a);
+    const marks = a.brand.marks.concat(briefMarks(bRows, a.brand));
+    const place = placer(a, marks);
+    const brand = items.map((i) => {
+      const [cls, word] = BRAND_BADGE[i.status] || ["review", i.status];
+      return { id: i.id, title: C.label(i.id), sub: esc(C.ITEMS.find((x) => x.id === i.id).cat), cls, word, evidence: i.evidence, ...place(i.id) };
+    });
+    const brief = bRows.map((r) => {
+      const [cls, word] = BRIEF_BADGE[r.status] || ["review", r.status];
+      return { id: r.id, title: r.req.text, sub: `<span class="prio ${r.priority === 1 ? "top" : ""}">P${r.priority}</span>${esc(r.brief.title)} · ${esc(r.req.kind)}`,
+               cls, word, evidence: r.note, quote: r.status !== "superseded" ? r.evidence : "", replaced: r.status === "superseded", ...place(r.id) };
+    });
+    // Rows a newer brief added since this draft started get their automatic suggestion.
+    for (const r of bRows) if (!(r.id in S.draft.decisions) && r.suggested) S.draft.decisions[r.id] = r.suggested;
+    return { brand, brief, bRows };
+  }
+
+  function groupsHTML(rows) {
+    return REGIONS.map(([k, label]) => {
+      const list = rows.filter((r) => r.region === k).sort((x, z) => x.y - z.y);
+      return list.length ? `<div class="cl-group"><div class="cl-group-h"><span>${label}</span><span>${list.length}</span></div>${list.map(rowHTML).join("")}</div>` : "";
+    }).join("");
+  }
+
   function renderChecklist() {
     const box = $("#checklist");
     if (!box) return;
-    const { m, ver, a } = S.current;
-    const items = itemsFor(ver, a.brand);
+    const { m, ver } = S.current;
     const d = S.draft;
-    const auto = items.filter((i) => i.method === "auto" && DECIDED.includes(i.status)).length;
-    const ai = items.filter((i) => i.method === "ai" && DECIDED.includes(i.status)).length;
-    const need = items.length - auto - ai;
-    const decided = items.filter((i) => d.decisions[i.id]).length;
-    const badge = (s) => `<span class="badge ${s}">${{ pass: "Pass", fail: "Fail", warn: "Check", review: "Needs eyes", na: "N/A" }[s] || s}</span>`;
-    const meth = (i) => i.method === "ai" ? '<span class="meth ai">✦ AI</span>' : i.method === "auto" ? '<span class="meth auto">Auto</span>' : '<span class="meth manual">Manual</span>';
-    const rows = items.map((i) => {
-      const dec = d.decisions[i.id];
-      const suggested = DECIDED.includes(i.status) ? i.status : null;
-      const seg = ["pass", "fail", "na"].map((v) => `<button type="button" class="${dec === v ? "on " + v : ""}" data-dec="${v}" aria-pressed="${dec === v}">${{ pass: "✓ Pass", fail: "✕ Fail", na: "N/A" }[v]}</button>`).join("");
-      return `<tr data-item="${i.id}" class="${dec ? "" : "undecided"}${S.focusItem === i.id ? " focus" : ""}">
-        <td class="cl-name" tabindex="0" title="Show on the preview"><b>${esc(C.label(i.id))}</b><small>${esc(C.ITEMS.find((x) => x.id === i.id).cat)}</small></td>
-        <td>${badge(i.status)} ${meth(i)}<div class="ev">${esc(i.evidence)}</div>${i.aiNote ? `<div class="ev ai">✦ AI second opinion (${esc(i.aiStatus)}): ${esc(i.aiNote)}</div>` : ""}</td>
-        <td><div class="seg">${seg}</div>${dec && suggested === dec && !d.touched[i.id] ? '<small class="pre">pre-filled</small>' : ""}</td>
-      </tr>`;
-    }).join("");
+    const { brand, brief } = checklistRows();
+    const decided = (rows) => rows.filter((r) => d.decisions[r.id]).length;
+    const bCounts = {};
+    for (const r of brief) bCounts[r.word] = (bCounts[r.word] || 0) + 1;
+    const briefs = briefsFor(m);
     const people = knownPeople().map((p) => `<option value="${esc(p)}">`).join("");
     const prior = S.reviews.filter((r) => r.mailerId === m.id && r.v === ver.v).map((r) => `
       <li data-act="review-detail" data-id="${esc(r.id)}" tabindex="0"><span class="stage-tag ${r.stage}">${r.stage === "final" ? "Final" : "Manual"}</span>
-        <b>${esc(r.reviewers.join(", "))}</b> ${r.verdict ? (r.verdict === "approved" ? "· approved ✓" : "· changes requested") : ""}
-        · ${r.tally.pass} pass / ${r.tally.fail} fail · ${fmtDate(r.at)}</li>`).join("");
-    const seg = (id, dec) => ["pass", "fail", "na"].map((v) => `<button type="button" class="${dec === v ? "on " + v : ""}" data-dec="${v}" aria-pressed="${dec === v}">${{ pass: "✓ Pass", fail: "✕ Fail", na: "N/A" }[v]}</button>`).join("");
-
-    // Brief requirements — same table, same decisions, pre-filled where the match is certain.
-    const bRows = briefRows(m, ver, a);
-    for (const row of bRows) if (!(row.id in d.decisions) && row.suggested) d.decisions[row.id] = row.suggested;
-    const BADGE = { found: ["pass", "Found"], partial: ["warn", "Partial"], missing: ["fail", "Missing"], conflict: ["fail", "Conflict"],
-                    verify: ["review", "Verify"], superseded: ["na", "Replaced"] };
-    const bAuto = bRows.filter((r) => r.suggested && r.method === "auto").length;
-    const bAI = bRows.filter((r) => r.suggested && r.method === "ai").length;
-    const bDecided = bRows.filter((r) => d.decisions[r.id]).length;
-    const bCounts = {};
-    for (const r of bRows) bCounts[r.status] = (bCounts[r.status] || 0) + 1;
-    const briefs = briefsFor(m);
-    const briefTable = bRows.map((r) => {
-      const dec = d.decisions[r.id];
-      const [cls, word] = BADGE[r.status] || ["review", r.status];
-      return `<tr data-item="${esc(r.id)}" class="${dec ? "" : "undecided"}${S.focusItem === r.id ? " focus" : ""}${r.status === "superseded" ? " replaced" : ""}">
-        <td class="cl-name" tabindex="0" title="Show on the preview"><b>${esc(r.req.text)}</b>
-          <small><span class="prio ${r.priority === 1 ? "top" : ""}">P${r.priority}</span> ${esc(r.brief.title)} · ${esc(r.req.kind)}</small></td>
-        <td><span class="badge ${cls}">${word}</span> ${r.method === "ai" ? '<span class="meth ai">✦ AI</span>' : '<span class="meth auto">Auto</span>'}
-          <div class="ev">${esc(r.note)}</div>${r.evidence && r.status !== "superseded" ? `<div class="ev quote">${esc(r.evidence)}</div>` : ""}</td>
-        <td><div class="seg">${seg(r.id, dec)}</div>${dec && dec === r.suggested && !d.touched[r.id] ? '<small class="pre">pre-filled</small>' : ""}</td>
-      </tr>`;
-    }).join("");
-    const briefCard = `<div class="card checklist brief-check">
-      <div class="cl-head">
-        <div><h3>Brief check</h3>
-          <p class="muted small">${briefs.length ? `Every requirement from ${briefs.length} brief(s), newest (P1) first — where briefs disagree the newer one wins and older lines show as replaced. Click a requirement to find it on the preview.` : "No brief is linked to this mailer yet."}</p></div>
-        ${briefs.length ? `<div class="cl-actions"><button class="btn ghost sm ai-btn" data-act="ai-brief-check" ${aiAttr()}>✦ AI brief check</button>${aiNote()}
-          ${ver.briefAI ? `<span class="ai-off-note">✦ AI checked ${fmtDate(ver.briefAI.at)} by ${esc(ver.briefAI.by)}</span>` : ""}</div>` : ""}
-      </div>
-      ${briefs.length ? `<div class="cl-split">
-          ${Object.entries(BADGE).filter(([k]) => bCounts[k]).map(([k, [c, w]]) => `<span class="sp b-${c}">${bCounts[k]} ${w.toLowerCase()}</span>`).join("")}
-          <span class="sp prog">${bDecided}/${bRows.length} decided</span></div>
-        ${bRows.length ? `<div class="table-wrap"><table class="cl-table">
-          <thead><tr><th>Brief requirement</th><th>Automated result</th><th>Reviewer decision</th></tr></thead>
-          <tbody>${briefTable}</tbody></table></div>` : `<p class="muted">The linked brief(s) have no checkable requirements — <a href="${P()}/briefs">add some</a>.</p>`}
-        <p class="muted small">${bAuto} decided automatically${bAI ? `, ${bAI} by AI` : ""} · partial and “verify” lines need your call.</p>`
-        : `<a class="btn sm" href="${P()}/briefs">+ Add a brief</a>`}
-    </div>`;
-
-    box.innerHTML = `<div class="card checklist">
-      <div class="cl-head">
-        <div><h3>Amex brand & copy checklist</h3>
-          <p class="muted small">Decided automatically where the PDF allows. Click a check’s name to see it highlighted on the preview beside it.</p></div>
-        <div class="cl-actions"><button class="btn ghost sm ai-btn" data-act="ai-brand" ${aiAttr()}>✦ AI-check the ${need} remaining</button>${aiNote()}</div>
-      </div>
-      <div class="cl-split">
-        <span class="sp auto">✓ ${auto} automated</span><span class="sp ai">✦ ${ai} by AI</span><span class="sp human">👤 ${need} need a reviewer</span>
-        <span class="sp prog">${decided}/${items.length} decided</span>
-      </div>
-      <div class="table-wrap"><table class="cl-table">
-        <thead><tr><th>Check</th><th>Automated result</th><th>Reviewer decision</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>
-      </div>
-      ${briefCard}
-      <div class="card checklist">
-      <h3>Submit the check</h3>
-      <div class="review-form">
-        <div class="rf-row"><span class="rf-l">Stage</span>
-          <div class="seg big"><button type="button" class="${d.stage === "manual" ? "on" : ""}" data-stage="manual">👤 Manual check</button><button type="button" class="${d.stage === "final" ? "on" : ""}" data-stage="final">🏁 Final professional check</button></div></div>
-        <div class="rf-row"><span class="rf-l">Checked by <i>*</i></span>
-          <div class="chips">${d.reviewers.map((n) => `<span class="pchip">${esc(n)}<button type="button" data-act="rm-reviewer" data-name="${esc(n)}" aria-label="Remove ${esc(n)}">×</button></span>`).join("")}
-            <form class="chip-add" data-form="add-reviewer"><input class="inp sm" name="who" list="peopleList" placeholder="Add another checker"><button class="btn ghost sm">+ Add</button></form>
-            <datalist id="peopleList">${people}</datalist></div></div>
-        ${d.stage === "final" ? `<div class="rf-row"><span class="rf-l">Verdict</span>
-          <div class="seg big"><button type="button" class="${d.verdict === "approved" ? "on pass" : ""}" data-verdict="approved">✓ Approve as final emailer</button><button type="button" class="${d.verdict === "changes" ? "on fail" : ""}" data-verdict="changes">↩ Send back for changes</button></div></div>` : ""}
-        <div class="rf-row"><span class="rf-l">Notes</span><textarea class="inp" id="rfNotes" rows="3" placeholder="What you checked, what needs changing…">${esc(d.notes)}</textarea></div>
-        <div class="rf-row"><span class="rf-l"></span><div><button class="btn" data-act="submit-review">${d.stage === "final" ? "Submit final check" : "Submit manual check"}</button> <span id="rfMsg" role="status"></span></div></div>
-      </div>
-      ${prior ? `<h4 class="prior-h">Checks on this version</h4><ul class="prior">${prior}</ul>` : ""}
-    </div>`;
+        <span><b>${esc(r.reviewers.join(", "))}</b>${r.verdict ? (r.verdict === "approved" ? " · approved" : " · changes requested") : ""} · ${r.tally.pass} pass / ${r.tally.fail} fail${r.compliance != null ? ` · ${r.compliance}%` : ""}</span>
+        <small>${fmtDate(r.at)}</small></li>`).join("");
+    box.innerHTML = `
+      <section class="card checklist" data-list="brand">
+        <div class="cl-head"><h3>Brand & copy checklist</h3><span class="sp prog">${decided(brand)}/${brand.length} decided</span></div>
+        <p class="cl-hint">In mailer order, from the top to the footer. Click a check to see it on the preview.</p>
+        ${groupsHTML(brand)}
+      </section>
+      <details class="card checklist brief-check" data-list="brief" ${S.briefOpen ? "open" : ""}>
+        <summary class="cl-head">
+          <span class="cl-sum-title">${icon("chevron")}<h3>Brief check</h3></span>
+          <span class="cl-sum-meta">${briefs.length ? `${Object.entries(bCounts).map(([w, n]) => `<span class="sp b-${(Object.values(BRIEF_BADGE).find((x) => x[1] === w) || ["na"])[0]}">${n} ${w.toLowerCase()}</span>`).join("")}
+            <span class="sp prog">${decided(brief)}/${brief.length} decided</span>` : '<span class="muted small">No brief linked</span>'}</span>
+        </summary>
+        ${briefs.length ? (brief.length ? `<p class="cl-hint">Every requirement from ${briefs.length} brief(s), in mailer order. Where briefs disagree the newest (P1) wins and older lines show as replaced.</p>${groupsHTML(brief)}`
+          : `<p class="cl-hint">The linked brief(s) have no checkable requirements — <a href="${P()}/briefs">add some</a>.</p>`)
+          : `<p class="cl-hint">Add a brief and every requirement in it is checked here, line by line.</p><a class="btn sm" href="${P()}/briefs">${icon("plus")}Add a brief</a>`}
+      </details>
+      <section class="card checklist">
+        <div class="cl-head"><h3>Submit the check</h3></div>
+        <div class="review-form">
+          <div class="rf-row"><span class="rf-l">Stage</span>
+            <div class="seg big"><button type="button" class="${d.stage === "manual" ? "on" : ""}" data-stage="manual">${icon("user")}Manual check</button><button type="button" class="${d.stage === "final" ? "on" : ""}" data-stage="final">${icon("flag")}Final professional check</button></div></div>
+          <div class="rf-row"><span class="rf-l">Checked by <i>*</i></span>
+            <div class="chips">${d.reviewers.map((n) => `<span class="pchip">${esc(n)}<button type="button" data-act="rm-reviewer" data-name="${esc(n)}" aria-label="Remove ${esc(n)}">${icon("x")}</button></span>`).join("")}
+              <form class="chip-add" data-form="add-reviewer"><input class="inp sm" name="who" list="peopleList" placeholder="Add another checker"><button class="btn ghost sm">${icon("plus")}Add</button></form>
+              <datalist id="peopleList">${people}</datalist></div></div>
+          ${d.stage === "final" ? `<div class="rf-row"><span class="rf-l">Verdict</span>
+            <div class="seg big"><button type="button" class="${d.verdict === "approved" ? "on pass" : ""}" data-verdict="approved">${icon("check")}Approve as final emailer</button><button type="button" class="${d.verdict === "changes" ? "on fail" : ""}" data-verdict="changes">${icon("undo")}Send back for changes</button></div></div>` : ""}
+          <div class="rf-row"><span class="rf-l">Notes</span><textarea class="inp" id="rfNotes" rows="3" placeholder="Anything the next reviewer should know">${esc(d.notes)}</textarea></div>
+          <div class="rf-row"><span class="rf-l"></span><div class="rf-submit"><button class="btn" data-act="submit-review">${d.stage === "final" ? "Submit final check" : "Submit manual check"}</button><span id="rfMsg" role="status"></span></div></div>
+        </div>
+        ${prior ? `<h4 class="prior-h">Checks on this version</h4><ul class="prior">${prior}</ul>` : ""}
+      </section>`;
     applyFocus(false);
   }
 
-  /* Click a checklist heading → dim the preview and light up just that check's boxes. */
+  // Redraw one row after a decision, without losing the scroll or the focus.
+  function refreshRow(id) {
+    const el = $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
+    if (!el) return;
+    const all = checklistRows();
+    const row = all.brand.concat(all.brief).find((r) => r.id === id);
+    el.outerHTML = rowHTML(row);
+    const list = $(`#checklist [data-list="${id.startsWith("brief:") ? "brief" : "brand"}"]`);
+    const rows = $$(".cl-row", list);
+    const prog = $(".sp.prog", list);
+    if (prog) prog.textContent = `${rows.filter((x) => S.draft.decisions[x.dataset.item]).length}/${rows.length} decided`;
+  }
+
+  /* Click a check → dim the preview and light up just that check's boxes. */
   function applyFocus(scroll) {
     const pv = $("#preview"), id = S.focusItem;
     if (!pv) return;
-    $$("#checklist tr.focus").forEach((tr) => tr.classList.remove("focus"));
+    $$("#checklist .cl-row.focus").forEach((x) => x.classList.remove("focus"));
     $$(".pv-mark.focus", pv).forEach((el) => el.classList.remove("focus"));
     const old = $("#pvFocus");
     if (old) old.remove();
     pv.classList.toggle("focusing", !!id);
     if (!id) return;
-    const row = $(`#checklist tr[data-item="${id}"]`);
+    const row = $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
     if (row) row.classList.add("focus");
     const hits = $$(".pv-mark", pv).filter((el) => el.dataset.item === id);
     hits.forEach((el) => el.classList.add("focus"));
+    const isBrief = id.startsWith("brief:");
+    const label = (row && $(".cl-title", row) || {}).textContent || C.label(id);
+    const none = isBrief ? "not found on the preview — the mailer doesn't seem to contain it"
+      : "judged from the whole mailer or from artwork, so there's no single spot to show";
     const bar = document.createElement("div");
     bar.id = "pvFocus";
     bar.className = "pv-focus";
-    const isBrief = id.startsWith("brief:");
-    const label = isBrief ? ($(`#checklist tr[data-item="${id}"] .cl-name b`) || {}).textContent || "Brief requirement" : C.label(id);
-    const none = isBrief ? "not found on the preview — the mailer doesn't seem to contain it (see the result in the table)"
-      : "nothing to point at on the preview (it is judged from the whole mailer or from artwork) — see the result in the table";
-    bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : none}</span><button type="button" data-act="clear-focus" aria-label="Clear highlight">× Show all</button>`;
+    bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : none}</span><button type="button" data-act="clear-focus">${icon("x")}Show all</button>`;
     $(".pv-legend", pv).before(bar);
     if (scroll && hits.length) hits[0].scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -614,55 +682,67 @@
   async function submitReview() {
     const { m, ver, a } = S.current;
     const d = S.draft;
-    const msg = $("#rfMsg");
     const items = itemsFor(ver, a.brand);
     const bRows = briefRows(m, ver, a);
-    if (!d.reviewers.length) { msg.className = "err"; msg.textContent = "Add at least one checker's name."; return; }
-    const missing = items.concat(bRows).filter((i) => !d.decisions[i.id]);
-    if (missing.length) {
-      msg.className = "err";
-      msg.textContent = `Decide ${missing.length} more item(s) first — highlighted in the table.`;
-      $$("#checklist tr.undecided").forEach((tr) => tr.classList.add("need"));
-      const first = $("#checklist tr.undecided");
-      if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+    const fail = (text) => { const msg = $("#rfMsg"); msg.className = "err"; msg.textContent = text; };
+    if (!d.reviewers.length) return fail("Add at least one checker's name.");
+    const all = items.map((i) => i.id).concat(bRows.map((r) => r.id));
+    const undecided = all.filter((id) => !d.decisions[id]);
+    const noWhy = all.filter((id) => d.touched[id] && (d.decisions[id] === "pass" || d.decisions[id] === "fail") && !(d.reasons[id] || "").trim());
+    if (undecided.length || noWhy.length) {
+      d.showErrors = true;
+      if (bRows.some((r) => undecided.includes(r.id) || noWhy.includes(r.id))) S.briefOpen = true;
+      renderChecklist();
+      fail([undecided.length && `${undecided.length} check(s) still need a decision`, noWhy.length && `${noWhy.length} decision(s) need a reason`].filter(Boolean).join(" · ") + " — highlighted above.");
+      const first = $("#checklist .cl-row.undecided, #checklist .cl-row.need");
+      if (first) { first.scrollIntoView({ behavior: "smooth", block: "center" }); const inp = $("input[data-reason]", first); if (inp) inp.focus({ preventScroll: true }); }
       return;
     }
     if (d.stage === "final" && !S.reviews.some((r) => r.mailerId === m.id && r.v === ver.v && r.stage === "manual")) {
       if (!await confirmModal("No manual check is recorded on this version yet. Submit the final check anyway?", "Submit final check")) return;
     }
+    const at = now(), who = d.reviewers.join(", ");
+    // A decision is this reviewer's when they clicked it; otherwise it carries forward
+    // from the previous reviewer, or from the automated check.
+    const record = (id, auto, method, evidence) => {
+      const dec = d.decisions[id], prev = d.last[id];
+      if (d.touched[id]) return { decision: dec, auto, reason: (d.reasons[id] || "").trim(), who, at, by: "human" };
+      if (prev) return { decision: dec, auto, reason: prev.reason, who: prev.who, at: prev.at, by: prev.by, carried: true };
+      return { decision: dec, auto, reason: `Automated: ${evidence || ""}`.trim(), who: method === "ai" ? "AI" : "Automated", at, by: method === "ai" ? "ai" : "auto" };
+    };
     const byItem = {}, tally = { pass: 0, fail: 0, na: 0 }, split = { auto: 0, ai: 0, human: 0 };
     for (const i of items) {
-      const dec = d.decisions[i.id];
-      const suggested = DECIDED.includes(i.status) ? i.status : null;
-      const by = suggested === dec ? (i.method === "ai" ? "ai" : "auto") : "human";
-      byItem[i.id] = { decision: dec, auto: i.status, method: i.method, evidence: i.evidence, by };
-      tally[dec]++; split[by]++;
+      byItem[i.id] = { ...record(i.id, i.status, i.method, i.evidence), method: i.method, evidence: i.evidence };
+      tally[byItem[i.id].decision]++; split[byItem[i.id].by === "human" ? "human" : byItem[i.id].by === "ai" ? "ai" : "auto"]++;
     }
     const briefItems = {}, briefTally = { pass: 0, fail: 0, na: 0 };
     for (const r of bRows) {
-      const dec = d.decisions[r.id];
-      briefItems[r.id] = { text: r.req.text, brief: r.brief.title, priority: r.priority, auto: r.status, note: r.note,
-        decision: dec, by: dec === r.suggested ? (r.method === "ai" ? "ai" : "auto") : "human" };
-      briefTally[dec]++;
+      briefItems[r.id] = { ...record(r.id, r.status, r.method, r.note), text: r.req.text, brief: r.brief.title, priority: r.priority, note: r.note };
+      briefTally[briefItems[r.id].decision]++;
     }
+    const counted = Object.values(byItem).concat(Object.values(briefItems)).filter((x) => x.decision !== "na");
+    const approved = d.stage === "final" && d.verdict === "approved";
+    const pct = approved ? 100 : counted.length ? Math.round((counted.filter((x) => x.decision === "pass").length / counted.length) * 100) : 0;
     const review = {
       id: DB.uid(), projectId: S.project.id, mailerId: m.id, v: ver.v, stage: d.stage, reviewers: [...d.reviewers],
-      notes: d.notes.trim(), verdict: d.stage === "final" ? d.verdict : null, at: now(), byItem, tally, split, briefItems, briefTally,
-      engineScore: ver.engine.score
+      notes: d.notes.trim(), verdict: d.stage === "final" ? d.verdict : null, at, byItem, tally, split, briefItems, briefTally,
+      engineScore: ver.engine.score, compliance: pct
     };
     await DB.put("reviews", review);
+    const vv = m.versions.find((x) => x.v === ver.v);
+    vv.compliance = pct;
     if (d.stage === "final") {
-      if (d.verdict === "approved") m.final = { v: ver.v, by: review.reviewers, at: review.at, reviewId: review.id };
+      if (approved) m.final = { v: ver.v, by: review.reviewers, at, reviewId: review.id };
       else if (m.final && m.final.v === ver.v) m.final = null;
-      await DB.put("mailers", m);
     }
-    const what = d.stage === "final" ? (d.verdict === "approved" ? "Final check — approved" : "Final check — changes requested") : "Manual check";
-    await logEvent({ type: "review", mailerId: m.id, v: ver.v, reviewId: review.id, by: review.reviewers.join(", "),
-      text: `${what} on “${m.name}” v${ver.v} by ${review.reviewers.join(", ")} — ${tally.pass} pass, ${tally.fail} fail` +
-        (bRows.length ? ` · brief ${briefTally.pass}/${bRows.length - briefTally.na} met` : "") });
-    S.draft = { ...newDraft(S.current.key, items), reviewers: d.reviewers, stage: d.stage };
+    await DB.put("mailers", m);
+    const what = d.stage === "final" ? (approved ? "Final check — approved" : "Final check — changes requested") : "Manual check";
+    await logEvent({ type: "review", mailerId: m.id, v: ver.v, reviewId: review.id, by: who,
+      text: `${what} on “${m.name}” v${ver.v} by ${who} — ${tally.pass} pass, ${tally.fail} fail` +
+        (bRows.length ? ` · brief ${briefTally.pass}/${bRows.length - briefTally.na} met` : "") + ` · ${pct}% compliant` });
     await reloadProject(S.project.id);
-    toast(`${what} saved`);
+    S.draft = { ...newDraft(S.current.key, m, ver, a), reviewers: d.reviewers, stage: d.stage };
+    toast(`${what} saved · ${pct}% compliant`);
     render();
   }
 
@@ -675,69 +755,6 @@
     await logEvent({ type: "ai", mailerId: m.id, v: ver.v, text: `AI vision pass on “${m.name}” v${ver.v} — ${marks.length} finding(s)` });
     await reloadProject(S.project.id);
     renderSide();
-  }
-
-  async function runAIBrand(btn) {
-    const { m, ver, a } = S.current;
-    btn.disabled = true;
-    btn.innerHTML = `${spinner}AI is reading the mailer…`;
-    try {
-      const pages = (await E.renderPagesForVision(a.r.pdf)).map((p) => ({ page: p.page, png: p.png, w: p.w, h: p.h }));
-      const items = itemsFor(ver, a.brand)
-        .filter((i) => !DECIDED.includes(i.status) || C.ITEMS.find((x) => x.id === i.id).how === "ai")
-        .map((i) => ({ id: i.id, label: C.label(i.id), hint: i.evidence }));
-      const res = await api("/api/brand", { pages, text: a.brand.text, items, mailerType: m.type });
-      const mm = S.mailers.find((x) => x.id === m.id), vv = mm.versions.find((x) => x.v === ver.v);
-      vv.aiBrand = { results: res.results, at: now(), by: S.user, model: res.model };
-      vv.brand.items = C.mergeAI(a.brand.items, res.results);
-      await DB.put("mailers", mm);
-      await logEvent({ type: "ai", mailerId: m.id, v: ver.v, text: `AI checked ${res.results.length} checklist item(s) on “${m.name}” v${ver.v}` });
-      S.draft = newDraft(S.current.key, vv.brand.items);
-      await reloadProject(S.project.id);
-      toast("AI results added to the checklist");
-      render();
-    } catch (err) {
-      toast(err.message, "err");
-      btn.disabled = false;
-      btn.textContent = "✦ Try the AI check again";
-    }
-  }
-
-  /* ---------- right-hand notes: who has worked on this mailer ---------- */
-  function notesHTML(m) {
-    const reviews = S.reviews.filter((r) => r.mailerId === m.id).map((r) => `
-      <li data-act="review-detail" data-id="${esc(r.id)}" tabindex="0"><span class="stage-tag ${r.stage}">${r.stage === "final" ? "Final" : "Manual"}</span>
-        <b>${esc(r.reviewers.join(", "))}</b><small>v${r.v} · ${fmtDate(r.at)}${r.verdict ? " · " + (r.verdict === "approved" ? "approved" : "changes") : ""}</small></li>`).join("");
-    const who = `<div class="notes-card"><h3>Who checked this mailer</h3>
-      <ul class="who">
-        ${m.versions.slice().reverse().map((v) => `<li><span class="stage-tag auto">Upload</span><b>${esc(v.uploadedBy)}</b><small>v${v.v} · ${fmtDate(v.uploadedAt)} · auto-checked</small></li>`).join("")}
-        ${reviews}
-      </ul></div>`;
-    return who;
-  }
-
-  async function runAIBriefCheck(btn) {
-    const { m, ver, a } = S.current;
-    const rows = B.checkAll(briefsFor(m), a.brand.text).filter((x) => x.status !== "superseded");
-    if (!rows.length) return toast("No requirements to check.", "err");
-    btn.disabled = true;
-    btn.innerHTML = `${spinner}AI is comparing…`;
-    try {
-      const res = await api("/api/brief-check", {
-        requirements: rows.map((x) => ({ id: x.req.id, text: x.req.text, brief: x.brief.title, priority: x.priority })),
-        mailerText: a.brand.text
-      });
-      const mm = S.mailers.find((x) => x.id === m.id), vv = mm.versions.find((x) => x.v === ver.v);
-      vv.briefAI = { results: res.results, at: now(), by: S.user };
-      await DB.put("mailers", mm);
-      await logEvent({ type: "ai", mailerId: m.id, v: ver.v, text: `AI brief check on “${m.name}” v${ver.v} — ${res.results.length} requirement(s)` });
-      await reloadProject(S.project.id);
-      render();
-    } catch (err) {
-      toast(err.message, "err");
-      btn.disabled = false;
-      btn.textContent = "✦ Try the AI brief check again";
-    }
   }
 
   /* ---------- briefs tab ---------- */
@@ -756,7 +773,7 @@
         <div class="uc-head"><h2>Add a brief</h2><span class="muted small">Every format is stored. Newer briefs take priority over older ones.</span></div>
         <label class="ws-drop compact" data-drop="brief">
           <input type="file" multiple accept="${B.ACCEPT}" class="vh">
-          <span class="drop-icon">📎</span>
+          <span class="drop-icon">${icon("clip")}</span>
           <span class="drop-title">Drop brief files or <u>browse</u> — several at once is fine</span>
           <span class="drop-hint">PDF · Word (.docx/.doc) · Excel (.xlsx/.xls/.csv) · PowerPoint (.pptx/.ppt) · TXT · RTF · HTML · email · images</span>
         </label>
@@ -774,18 +791,18 @@
   function briefDetailHTML(b, scopeOpts) {
     const s = b.summary || {};
     const reqs = (b.requirements || []).map((q) => `<li><span class="kind ${q.kind}">${esc(q.kind)}</span><span class="rq">${esc(q.text)}</span>
-      <span class="src">${q.source === "ai" ? "✦ AI" : q.source === "user" ? "added" : "auto"}</span>
-      <button class="icon-btn sm" data-act="brief-req-del" data-id="${esc(q.id)}" aria-label="Remove requirement">×</button></li>`).join("");
+      <span class="src">${q.source === "ai" ? "AI" : q.source === "user" ? "added" : "auto"}</span>
+      <button class="icon-btn sm" data-act="brief-req-del" data-id="${esc(q.id)}" aria-label="Remove requirement">${icon("x")}</button></li>`).join("");
     const sheets = b.sheets && b.sheets.length > 1 ? `<div class="sheets"><b>Sheets used:</b> ${b.sheets.map((sh, i) => `
       <label><input type="checkbox" data-change="brief-sheet" data-i="${i}" ${sh.use ? "checked" : ""}> ${esc(sh.name)} <small>(${sh.rows.length} rows)</small></label>`).join("")}</div>` : "";
     return `<div class="card">
       <div class="bd-head">
         <div><h3><span class="prio ${priorityOf(b) === 1 ? "top" : ""}">P${priorityOf(b)}</span> ${esc(b.title)}
-          <button class="icon-btn sm" data-act="brief-rename" aria-label="Rename brief">✎</button></h3>
+          <button class="icon-btn sm" data-act="brief-rename" aria-label="Rename brief">${icon("pencil")}</button></h3>
           <div class="muted small">${b.kind === "change" ? "Change brief — overrides older briefs where they disagree" : "Original brief"} · added by <b>${esc(b.uploadedBy)}</b> ${fmtDate(b.uploadedAt)}</div></div>
         <div class="bd-actions">
-          ${b.fileId ? `<button class="btn ghost sm" data-act="brief-download">⬇ ${esc(b.fileName)}</button>` : ""}
-          <button class="icon-btn" data-act="brief-delete" title="Delete brief" aria-label="Delete brief">🗑</button>
+          ${b.fileId ? `<button class="btn ghost sm" data-act="brief-download">${icon("download")}<span>${esc(b.fileName)}</span></button>` : ""}
+          <button class="btn ghost sm icon-only danger-ghost" data-act="brief-delete" title="Delete brief" aria-label="Delete brief">${icon("trash")}</button>
         </div>
       </div>
       <div class="upload-opts"><label>Applies to <select data-change="brief-scope">${scopeOpts(b.mailerId)}</select></label></div>
@@ -799,17 +816,16 @@
       ${(s.urls || []).length ? `<p class="small"><b>Links:</b> ${s.urls.map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(E.trim(u, 60))}</a>`).join(" · ")}</p>` : ""}
       <p class="muted small">${s.words || 0} words read from the brief.</p>
 
-      <div class="ai-row">
-        <button class="btn ghost sm ai-btn" data-act="brief-ai-summary" ${aiAttr()}>✦ AI summary & requirements</button>
-        <button class="btn ghost sm ai-btn" data-act="brief-reframe" ${aiAttr()}>✦ Reframe into a detailed script</button>
-        ${aiNote()}
-      </div>
+      ${S.ai.available ? `<div class="ai-row">
+        <button class="btn ghost sm ai-btn" data-act="brief-ai-summary">${icon("sparkle")}<span>AI summary & requirements</span></button>
+        <button class="btn ghost sm ai-btn" data-act="brief-reframe">${icon("sparkle")}<span>Reframe into a detailed script</span></button>
+      </div>` : ""}
       ${b.ai ? `<div class="ai-box"><h5>✦ AI summary <small>${fmtDate(b.ai.at)} · ${esc(b.ai.by)}</small></h5>
         <ul>${b.ai.summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
         <button class="btn sm" data-act="brief-ai-use">Use the AI's ${b.ai.requirements.length} requirements</button></div>` : ""}
       ${b.script ? `<div class="ai-box"><h5>✦ Detailed script <small>${fmtDate(b.script.at)} · ${esc(b.script.by)}</small></h5>
         <pre class="script">${esc(b.script.text)}</pre>
-        <button class="btn ghost sm" data-act="brief-script-copy">Copy</button> <button class="btn ghost sm" data-act="brief-script-download">⬇ Download .txt</button></div>` : ""}
+        <button class="btn ghost sm" data-act="brief-script-copy">Copy</button> <button class="btn ghost sm" data-act="brief-script-download">${icon("download")}<span>Download .txt</span></button></div>` : ""}
 
       <h4 class="bd-h">Requirements checked against mailers <small>${(b.requirements || []).length}</small></h4>
       <p class="muted small">Each line is checked in every mailer this brief applies to (see the notes beside the preview). Remove noise, add anything missing.</p>
@@ -817,7 +833,7 @@
       <form class="req-add" data-form="add-req">
         <select name="kind" aria-label="Requirement type"><option value="fact">Fact / offer</option><option value="cta">CTA</option><option value="date">Date</option><option value="theme">Theme</option><option value="instruction">Instruction</option></select>
         <input class="inp sm" name="text" placeholder="e.g. 11,000 Membership Rewards points on upgrade" required maxlength="220">
-        <button class="btn ghost sm">+ Add</button>
+        <button class="btn ghost sm">${icon("plus")}<span>Add</span></button>
         <button type="button" class="link" data-act="brief-reextract">Re-extract from brief</button>
       </form>
 
@@ -919,14 +935,14 @@
       return `<div class="hrow" data-href="${P()}/upload/${encodeURIComponent(c.m.id)}" tabindex="0">
         <div class="hlabel"><b>${esc(c.m.name)}</b><small>v${c.ver.v} · ${c.st.manualNames.length ? "manual: " + esc(c.st.manualNames.join(", ")) : "no manual check"}</small></div>
         <svg viewBox="0 0 ${W} 22" class="hbar" role="img" aria-label="Check split for ${esc(c.m.name)}">${bar(segs(c), t, W)}</svg>
-        <div class="hfinal ${c.st.approved ? "ok" : c.st.final ? "bad" : ""}">${c.st.approved ? "🏁 Final ✓ " + esc(c.st.final.reviewers.join(", ")) : c.st.final ? "🏁 Changes asked" : "🏁 Pending"}</div>
+        <div class="hfinal ${c.st.approved ? "ok" : c.st.final ? "bad" : ""}">${c.st.approved ? "Final ✓ " + esc(c.st.final.reviewers.join(", ")) : c.st.final ? "Changes asked" : "Final pending"}</div>
       </div>`;
     }).join("");
 
     const n = S.mailers.length;
     const manualDone = cov.filter((c) => c.st.manual.length).length;
     const finalDone = cov.filter((c) => c.st.approved).length;
-    const funnel = [["Mailers uploaded", n, "f0"], ["Automated + AI checked", n, "f1"], ["Manual checked", manualDone, "f2"], ["Final professional check ✓", finalDone, "f3"]]
+    const funnel = [["Mailers uploaded", n, "f0"], ["Automated check", n, "f1"], ["Manual checked", manualDone, "f2"], ["Final professional check ✓", finalDone, "f3"]]
       .map(([l, v, cls]) => `<div class="frow"><span>${l}</span><div class="ftrack"><div class="fbar ${cls}" style="width:${n ? (v / n) * 100 : 0}%"></div></div><b>${v}</b></div>`).join("");
 
     const people = {};
@@ -940,7 +956,7 @@
     const finals = S.mailers.filter((m) => m.final).map((m) => {
       const v = m.versions.find((x) => x.v === m.final.v);
       return `<tr><td><b>${esc(m.name)}</b></td><td>v${m.final.v}</td><td>${esc(m.final.by.join(", "))}</td><td>${fmtDate(m.final.at)}</td>
-        <td>${v ? `<button class="btn sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${m.final.v}">⬇ Download final emailer</button>` : "—"}</td></tr>`;
+        <td>${v ? `<button class="btn sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${m.final.v}">${icon("download")}<span>Download final emailer</span></button>` : "—"}</td></tr>`;
     }).join("");
 
     const filters = [["all", "All"], ["upload", "Uploads"], ["review", "Checks"], ["brief", "Briefs"], ["ai", "AI"]];
@@ -955,9 +971,9 @@
           <div class="hsum">
             <svg viewBox="0 0 ${W} 22" class="hbar big" role="img" aria-label="Overall check split">${bar(segs(sum), total, W)}</svg>
             <div class="legend">
-              <span><i class="s-auto"></i>Automated ${pct(sum.auto)}%</span><span><i class="s-ai"></i>AI ${pct(sum.ai)}%</span>
+              <span><i class="s-auto"></i>Automated ${pct(sum.auto)}%</span>${sum.ai ? `<span><i class="s-ai"></i>AI ${pct(sum.ai)}%</span>` : ""}
               <span><i class="s-manual"></i>Manual ${pct(sum.manual)}%</span><span><i class="s-pending"></i>Waiting ${pct(sum.pending)}%</span>
-              <span>🏁 Final approved ${finalDone}/${n}</span>
+              <span>Final approved ${finalDone}/${n}</span>
             </div>
           </div>
           ${perMailer || '<p class="muted">Upload a mailer to see the split.</p>'}
@@ -968,6 +984,14 @@
         ${peopleRows ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Manual checks</th><th>Final checks</th><th>Uploads</th><th>Briefs</th><th>Last active</th></tr></thead><tbody>${peopleRows}</tbody></table></div>` : '<p class="muted">Nobody has worked on this project yet.</p>'}</div>
       <div class="card"><h3>Final emailers</h3>
         ${finals ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Mailer</th><th>Version</th><th>Approved by</th><th>When</th><th></th></tr></thead><tbody>${finals}</tbody></table></div>` : '<p class="muted">No mailer has passed the final professional check yet.</p>'}</div>
+      <div class="card"><h3>Briefs uploaded</h3>
+        ${S.briefs.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Priority</th><th>Brief</th><th>Type</th><th>Applies to</th><th>Requirements</th><th>Added by</th><th>When</th><th></th></tr></thead><tbody>
+        ${S.briefs.map((b) => `<tr class="click" data-href="${P()}/briefs/${encodeURIComponent(b.id)}" tabindex="0"><td><span class="prio ${priorityOf(b) === 1 ? "top" : ""}">P${priorityOf(b)}</span></td>
+          <td><b>${esc(b.title)}</b><div class="muted small">${esc((b.format || "").toUpperCase())}</div></td><td>${b.kind === "change" ? "Change brief" : "Original"}</td>
+          <td>${b.mailerId ? esc((S.mailers.find((m) => m.id === b.mailerId) || {}).name || "a deleted mailer") : "All mailers"}</td><td>${(b.requirements || []).length}</td>
+          <td>${esc(b.uploadedBy)}</td><td class="nowrap">${fmtDate(b.uploadedAt)}</td>
+          <td>${b.fileId ? `<button class="btn ghost sm icon-only" data-act="download-brief" data-id="${esc(b.id)}" title="Download ${esc(b.fileName)}" aria-label="Download brief">${icon("download")}</button>` : ""}</td></tr>`).join("")}
+        </tbody></table></div>` : `<p class="muted">No briefs yet — <a href="${P()}/briefs">add one</a>.</p>`}</div>
       <div class="card"><div class="uc-head"><h3>Everything that happened</h3>
         <div class="filters">${filters.map(([k, l]) => `<button class="fchip ${S.histFilter === k ? "on" : ""}" data-act="hist-filter" data-k="${k}">${l}</button>`).join("")}</div></div>
         <p class="muted small">Click any row to see exactly what was done.</p>
@@ -992,7 +1016,7 @@
         ${v.aiBrand ? `<dt>AI checklist</dt><dd>${v.aiBrand.results.length} item(s) by ${esc(v.aiBrand.by)} · ${fmtDate(v.aiBrand.at)}</dd>` : ""}
         ${v.vision ? `<dt>AI vision</dt><dd>${v.vision.marks.length} finding(s) by ${esc(v.vision.by)} · ${fmtDate(v.vision.at)}</dd>` : ""}</dl>
         <p><a class="btn sm" data-href="${P()}/upload/${encodeURIComponent(m.id)}/v${v.v}" href="${P()}/upload/${encodeURIComponent(m.id)}/v${v.v}">Open this version</a>
-        <button class="btn ghost sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${v.v}">⬇ PDF</button></p>`;
+        <button class="btn ghost sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${v.v}">${icon("download")}<span>PDF</span></button></p>`;
     } else if (b) {
       body += `<dl class="kv"><dt>Brief</dt><dd>${esc(b.title)} (${esc(b.format.toUpperCase())})</dd><dt>Type</dt><dd>${b.kind === "change" ? "Change brief" : "Original"}</dd>
         <dt>Requirements</dt><dd>${(b.requirements || []).length}</dd></dl>
@@ -1005,20 +1029,21 @@
     const r = S.reviews.find((x) => x.id === id);
     if (!r) return toast("That check was deleted with its mailer.", "err");
     const m = S.mailers.find((x) => x.id === r.mailerId);
-    const by = { auto: "Automated", ai: "✦ AI", human: "👤 Reviewer" };
+    const by = { auto: "Automated", ai: "AI", human: "Reviewer" };
     const rows = Object.entries(r.byItem).map(([k, x]) => `<tr class="${x.decision}"><td>${esc(C.label(k))}</td>
-      <td><span class="badge ${x.auto}">${esc(x.auto)}</span></td><td><b>${esc(x.decision)}</b></td><td>${by[x.by]}${x.by === "human" && DECIDED.includes(x.auto) ? " (overrode)" : ""}</td></tr>`).join("");
+      <td><span class="badge ${x.auto}">${esc(x.auto)}</span></td><td><b>${esc(x.decision)}</b></td>
+      <td>${esc(x.who || by[x.by])}${x.carried ? " (earlier)" : ""}</td><td>${esc(x.reason || "")}</td></tr>`).join("");
     modal({
       title: `${r.stage === "final" ? "Final professional check" : "Manual check"} — ${m ? m.name : "deleted mailer"} v${r.v}`, wide: true,
       body: `<dl class="kv"><dt>Checked by</dt><dd>${esc(r.reviewers.join(", "))}</dd><dt>When</dt><dd>${fmtDate(r.at)}</dd>
         ${r.verdict ? `<dt>Verdict</dt><dd>${r.verdict === "approved" ? "✓ Approved as final emailer" : "↩ Sent back for changes"}</dd>` : ""}
-        <dt>Result</dt><dd>${r.tally.pass} pass · ${r.tally.fail} fail · ${r.tally.na} n/a — handbook score ${r.engineScore}%</dd>
+        <dt>Result</dt><dd>${r.tally.pass} pass · ${r.tally.fail} fail · ${r.tally.na} n/a${r.compliance != null ? ` — ${r.compliance}% compliant` : ""}</dd>
         <dt>Decided by</dt><dd>${r.split.auto} automated · ${r.split.ai} AI · ${r.split.human} by the reviewer</dd>
         ${r.notes ? `<dt>Notes</dt><dd class="pre">${esc(r.notes)}</dd>` : ""}</dl>
-        <div class="table-wrap"><table class="tbl small"><thead><tr><th>Check</th><th>Automated said</th><th>Decision</th><th>Decided by</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="table-wrap"><table class="tbl small"><thead><tr><th>Check</th><th>Automated said</th><th>Decision</th><th>Decided by</th><th>Why</th></tr></thead><tbody>${rows}</tbody></table></div>
         ${r.briefItems && Object.keys(r.briefItems).length ? `<h4 class="bd-h">Brief check — ${r.briefTally.pass} met · ${r.briefTally.fail} not met · ${r.briefTally.na} n/a</h4>
-          <div class="table-wrap"><table class="tbl small"><thead><tr><th>Requirement</th><th>Brief</th><th>Automated said</th><th>Decision</th><th>Decided by</th></tr></thead><tbody>
-          ${Object.values(r.briefItems).map((x) => `<tr class="${x.decision}"><td>${esc(x.text)}</td><td>P${x.priority} ${esc(x.brief)}</td><td>${esc(x.auto)}</td><td><b>${esc(x.decision)}</b></td><td>${by[x.by]}</td></tr>`).join("")}
+          <div class="table-wrap"><table class="tbl small"><thead><tr><th>Requirement</th><th>Brief</th><th>Automated said</th><th>Decision</th><th>Decided by</th><th>Why</th></tr></thead><tbody>
+          ${Object.values(r.briefItems).map((x) => `<tr class="${x.decision}"><td>${esc(x.text)}</td><td>P${x.priority} ${esc(x.brief)}</td><td>${esc(x.auto)}</td><td><b>${esc(x.decision)}</b></td><td>${esc(x.who || by[x.by])}</td><td>${esc(x.reason || "")}</td></tr>`).join("")}
           </tbody></table></div>` : ""}
         ${m ? `<p><a class="btn sm" data-href="${P()}/upload/${encodeURIComponent(m.id)}/v${r.v}" href="${P()}/upload/${encodeURIComponent(m.id)}/v${r.v}">Open this version</a></p>` : ""}`
     });
@@ -1028,7 +1053,7 @@
   function renderRulebook(view) {
     const how = { auto: '<span class="cov auto">automated</span>', ai: '<span class="cov ai">ai / reviewer</span>' };
     view.innerHTML = `
-      <div class="ref-card"><div class="ref-icon">📄</div>
+      <div class="ref-card"><div class="ref-icon">${icon("file")}</div>
         <div class="ref-body"><strong>Mobile Optimisation Handbook</strong><span id="refNote">The American Express source these rules come from — 24 pages.</span></div>
         <div class="ref-actions" id="refActions"><a class="btn" href="reference/mobile-optimisation-handbook.pdf" target="_blank" rel="noopener">Open PDF</a></div></div>
       <div class="card"><h3>Amex brand & copy checklist — ${C.ITEMS.length} items</h3>
@@ -1081,10 +1106,9 @@
     "submit-review": () => submitReview(),
     "review-detail": (el) => reviewDetail(el.dataset.id),
     "event-detail": (el) => eventDetail(el.dataset.id),
-    "ai-brand": (el) => runAIBrand(el),
-    "ai-brief-check": (el) => runAIBriefCheck(el),
     "hist-filter": (el) => { S.histFilter = el.dataset.k; renderHistory($("#view")); },
     "brief-download": () => { const b = selectedBrief(); downloadFile(b.fileId, b.fileName); },
+    "download-brief": (el) => { const b = S.briefs.find((x) => x.id === el.dataset.id); if (b) downloadFile(b.fileId, b.fileName); },
     "brief-delete": async () => {
       const b = selectedBrief();
       if (!await confirmModal(`Delete the brief “${b.title}”?`, "Delete brief", true)) return;
@@ -1110,7 +1134,7 @@
         const res = await api("/api/brief", { ...(await briefPayload(b)), action: "analyse" });
         b.ai = { summary: res.summary, requirements: res.requirements, at: now(), by: S.user };
         saveBrief(b, `AI summarised brief “${b.title}”`);
-      } catch (err) { toast(err.message, "err"); el.disabled = false; el.textContent = "✦ AI summary & requirements"; }
+      } catch (err) { toast(err.message, "err"); el.disabled = false; el.textContent = "AI summary & requirements"; }
     },
     "brief-ai-use": () => {
       const b = selectedBrief();
@@ -1125,7 +1149,7 @@
         const res = await api("/api/brief", { ...(await briefPayload(b)), action: "reframe" });
         b.script = { text: res.script, at: now(), by: S.user };
         saveBrief(b, `AI reframed brief “${b.title}” into a detailed script`);
-      } catch (err) { toast(err.message, "err"); el.disabled = false; el.textContent = "✦ Reframe into a detailed script"; }
+      } catch (err) { toast(err.message, "err"); el.disabled = false; el.textContent = "Reframe into a detailed script"; }
     },
     "brief-script-copy": () => navigator.clipboard.writeText(selectedBrief().script.text).then(() => toast("Script copied")),
     "brief-script-download": () => { const b = selectedBrief(); saveBlob(new Blob([b.script.text], { type: "text/plain" }), `${b.title} - detailed script.txt`); }
@@ -1138,26 +1162,21 @@
       Promise.resolve().then(() => actions[act.dataset.act](act)).catch((err) => { console.error(err); toast(err.message, "err"); });
       return;
     }
-    const nm = e.target.closest("#checklist td.cl-name");
+    const nm = e.target.closest("#checklist .cl-name");
     if (nm) {
-      const id = nm.closest("tr").dataset.item;
+      const id = nm.closest(".cl-row").dataset.item;
       S.focusItem = S.focusItem === id ? null : id;
       applyFocus(true);
       return;
     }
     const dec = e.target.closest("[data-dec]");
     if (dec) {
-      // Update the row in place — re-rendering the table on every click loses the scroll.
-      const tr = dec.closest("tr"), id = tr.dataset.item, v = dec.dataset.dec;
-      S.draft.decisions[id] = v;
+      const id = dec.closest(".cl-row").dataset.item;
+      S.draft.decisions[id] = dec.dataset.dec;
       S.draft.touched[id] = true;
-      tr.classList.remove("undecided", "need");
-      $$("[data-dec]", tr).forEach((b) => { const on = b.dataset.dec === v; b.className = on ? "on " + v : ""; b.setAttribute("aria-pressed", on); });
-      const pre = $(".pre", tr);
-      if (pre) pre.remove();
-      const card = tr.closest(".card"), prog = card && $(".sp.prog", card);
-      const rowsHere = card ? $$("tbody tr", card) : [];
-      if (prog) prog.textContent = `${rowsHere.filter((x) => S.draft.decisions[x.dataset.item]).length}/${rowsHere.length} decided`;
+      refreshRow(id);
+      const inp = $(`#checklist input[data-reason="${CSS.escape(id)}"]`);
+      if (inp && !inp.value) inp.focus();
       return;
     }
     const stage = e.target.closest("[data-stage]");
@@ -1168,12 +1187,20 @@
     if (link && !e.target.closest("a[href]:not([data-href]), button, select, input, label")) go(link.dataset.href);
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && e.target.matches("td.cl-name")) { e.preventDefault(); e.target.click(); return; }
     if (e.key !== "Enter" || !e.target.matches("[data-href][tabindex], [data-act][tabindex]")) return;
     e.preventDefault();
     e.target.click();
   });
-  document.addEventListener("input", (e) => { if (e.target.id === "rfNotes" && S.draft) S.draft.notes = e.target.value; });
+  document.addEventListener("input", (e) => {
+    if (!S.draft) return;
+    if (e.target.id === "rfNotes") S.draft.notes = e.target.value;
+    const rid = e.target.dataset && e.target.dataset.reason;
+    if (rid) {
+      S.draft.reasons[rid] = e.target.value;
+      if (e.target.value.trim()) { e.target.closest(".cl-why").classList.remove("need"); e.target.closest(".cl-row").classList.remove("need"); }
+    }
+  });
+  document.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches("details.brief-check")) S.briefOpen = e.target.open; }, true);
 
   document.addEventListener("submit", async (e) => {
     const f = e.target.closest("[data-form]");
@@ -1221,6 +1248,7 @@
     }
     const kind = el.dataset.change;
     if (!kind) return;
+    if (kind === "jump-brief") return el.value && go(`${P()}/briefs/${encodeURIComponent(el.value)}`);
     if (kind === "mailer-version") return go(`${P()}/upload/${encodeURIComponent(S.current.m.id)}/v${el.value}`);
     if (kind === "mailer-type") {
       const m = S.mailers.find((x) => x.id === S.current.m.id);
@@ -1300,7 +1328,7 @@
   $("#aiBadge").addEventListener("click", () => modal({
     title: S.ai.available ? "AI is on" : "AI is off",
     body: S.ai.available
-      ? `<p>AI features use <b>${esc(S.ai.model)}</b> through your local server. Pages and brief text are sent to Anthropic only when you press a ✦ button.</p>`
+      ? `<p>AI features use <b>${esc(S.ai.model)}</b> through your local server. Pages and brief text are sent to Anthropic only when you press an AI button.</p>`
       : `<p><b>Why:</b> ${esc(S.ai.reason)}</p><p>Everything else — the handbook engine, the brand checklist, brief reading and brief checks — runs without AI.</p>
          <p>To turn AI on: put a valid key in <code>.env</code> as <code>ANTHROPIC_API_KEY=…</code>, then run <code>./start.sh</code> and open the address it prints.</p>`
   }));
@@ -1310,7 +1338,7 @@
     const b = $("#storeBadge");
     const shared = DB.mode === "shared";
     b.className = "ai-badge " + (shared ? "on store" : "off");
-    b.textContent = shared ? "👥 Shared" : "💻 This browser only";
+    b.innerHTML = shared ? `${icon("users")}<span>Shared</span>` : `${icon("laptop")}<span>This browser only</span>`;
     b.title = shared ? "Everyone using this site sees the same projects" : "No shared storage here — projects are saved in this browser only";
   }
   $("#storeBadge").addEventListener("click", () => modal({
