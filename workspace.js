@@ -208,7 +208,7 @@
   function parseRoute() {
     const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
     if (parts[0] !== "p" || !parts[1]) return { view: "dash" };
-    return { view: "project", pid: parts[1], tab: parts[2] || "upload", id: parts[3] || null,
+    return { view: "project", pid: parts[1], tab: parts[2] || "briefs", id: parts[3] || null,
              v: parts[4] ? +parts[4].replace(/^v/, "") : null };
   }
   const go = (hash) => { if (location.hash === hash) render(); else location.hash = hash; };
@@ -233,7 +233,7 @@
       else if (rt.tab === "briefs") renderBriefs(view, rt);
       else if (rt.tab === "history") renderHistory(view);
       else if (rt.tab === "rulebook") renderRulebook(view);
-      else go(P() + "/upload");
+      else go(P() + "/briefs");
     } catch (err) {
       console.error(err);
       toast("Something went wrong: " + err.message, "err");
@@ -262,7 +262,7 @@
     crumbs([{ label: "Projects" }]);
     const count = (store, pid, fn) => S.all[store].filter((x) => x.projectId === pid && (!fn || fn(x))).length;
     const cards = S.projects.map((p) => {
-      return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/upload" tabindex="0">
+      return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/briefs" tabindex="0">
         <div class="pc-top"><div class="pc-title"><h3>${esc(p.name)}</h3>${p.card ? `<span class="pc-card">${icon("card")}${esc(p.card)}</span>` : ""}</div>
           <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">${icon("trash")}</button></div>
         <div class="pc-stats">
@@ -302,7 +302,7 @@
     $("#tabs").innerHTML = `<button type="button" class="tab-toggle" data-act="toggle-side" aria-pressed="${!S.sideHidden}"
         title="${S.sideHidden ? "Show" : "Hide"} the side panel" aria-label="${S.sideHidden ? "Show" : "Hide"} the side panel">${icon("panel")}${S.sideHidden ? "<span>Show panel</span>" : ""}</button>` +
       tabs.map(([k, ic, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${icon(ic)}<span>${l}</span></a>`).join("");
-    const parts = [{ label: "Projects", href: "#/" }, { label: S.project.name, href: P() + "/upload" }];
+    const parts = [{ label: "Projects", href: "#/" }, { label: S.project.name, href: P() + "/briefs" }];
     const tabName = { upload: "Upload & Analyse", briefs: "Briefs", history: "History", rulebook: "Rulebook" }[rt.tab];
     parts.push({ label: tabName, href: `${P()}/${rt.tab}` });
     const m = rt.tab === "upload" && rt.id && S.mailers.find((x) => x.id === rt.id);
@@ -834,7 +834,8 @@
       </li>`).join("");
     view.innerHTML = `
       <div class="card">
-        <div class="uc-head"><h2>Add a brief</h2><span class="muted small">Every format is stored. Newer briefs take priority over older ones.</span></div>
+        <div class="uc-head"><div><h2>Add a brief</h2><span class="muted small">Start here — every format is stored, and newer briefs take priority over older ones.</span></div>
+          <a class="btn ${S.briefs.length ? "" : "ghost"} sm" href="${P()}/upload">${S.briefs.length ? "Next: upload the mailer" : "Skip — upload the mailer"}${icon("chevron")}</a></div>
         <label class="ws-drop compact" data-drop="brief">
           <input type="file" multiple accept="${B.ACCEPT}" class="vh">
           <span class="drop-icon">${icon("clip")}</span>
@@ -1337,7 +1338,7 @@
         await DB.put("projects", p);
         S.project = p;
         await logEvent({ type: "project", text: `Created project “${p.name}”${p.card ? ` for ${p.card}` : ""}` });
-        go(`#/p/${encodeURIComponent(p.id)}/upload`);
+        go(`#/p/${encodeURIComponent(p.id)}/briefs`);
       } else if (f.dataset.form === "add-reviewer") {
         const who = (data.who || "").trim();
         if (who && !S.draft.reviewers.includes(who)) { S.draft.reviewers.push(who); saveDraft(); }
