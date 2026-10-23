@@ -33,10 +33,32 @@
 
   const CARDS = ["Platinum Reserve Credit Card", "Platinum Travel Credit Card", "Membership Rewards Credit Card", "SmartEarn Credit Card",
     "Gold Charge Card", "Platinum Charge Card (The Platinum Card)", "Centurion Card", "Corporate Card"];
-  const cardList = () => {
-    const all = uniq(CARDS.concat(S.projects.map((p) => p.card), S.project ? [S.project.card] : []));
-    return `<datalist id="cardList">${all.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>`;
-  };
+  const cardOptions = () => uniq(CARDS.concat(S.projects.map((p) => p.card), S.project ? [S.project.card] : []));
+  // A combobox, not a <datalist>: the browser's list looks like a fixed menu and hides
+  // that you can type. This one always ends with an explicit "type your own" option.
+  const cardCombo = (name, value) => `<div class="combo" data-combo>
+      <input class="inp" ${name ? `name="${name}"` : ""} value="${esc(value || "")}" placeholder="Pick a card or type any card name" maxlength="80"
+        autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list">
+      <button type="button" class="combo-btn" tabindex="-1" aria-label="Show card list">${icon("chevron")}</button>
+      <ul class="combo-list" role="listbox" hidden></ul>
+    </div>`;
+  function comboOpen(box) {
+    const inp = $("input", box), list = $(".combo-list", box), q = inp.value.trim().toLowerCase();
+    const opts = cardOptions().filter((c) => !q || c.toLowerCase().includes(q));
+    const exact = cardOptions().some((c) => c.toLowerCase() === q);
+    const items = opts.map((c) => `<li role="option" data-val="${esc(c)}">${icon("card")}<span>${esc(c)}</span></li>`);
+    items.push(q && !exact
+      ? `<li role="option" class="combo-new" data-val="${esc(inp.value.trim())}">${icon("plus")}<span>Use “${esc(inp.value.trim())}” as a new card</span></li>`
+      : `<li role="option" class="combo-new" data-type>${icon("pencil")}<span>Other card — type its name in the box</span></li>`);
+    list.innerHTML = items.join("");
+    list.hidden = false;
+    inp.setAttribute("aria-expanded", "true");
+  }
+  function comboClose(box) {
+    if (!box) return;
+    $(".combo-list", box).hidden = true;
+    $("input", box).setAttribute("aria-expanded", "false");
+  }
   const now = () => new Date().toISOString();
   const fmtDate = (iso) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -258,9 +280,8 @@
       </div>
       <form class="card new-proj" data-form="new-project">
         <label><span>Project name</span><input class="inp" name="name" placeholder="e.g. Plat Reserve Upgrade Sep '26" required maxlength="80"></label>
-        <label><span>Card <small>— pick one or type any card name</small></span><input class="inp" name="card" list="cardList" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80"></label>
+        <label><span>Card <small>— pick one or type any card name</small></span>${cardCombo("card", "")}</label>
         <button class="btn">${icon("plus")}<span>Create project</span></button>
-        ${cardList()}
       </form>
       ${S.projects.length ? `<div class="proj-grid">${cards}</div>` :
         `<div class="empty-card"><h3>No projects yet</h3><p>Create one above, then upload a mailer PDF and its brief.</p></div>`}
@@ -1148,7 +1169,7 @@
       const card = await modal({
         title: "Which card is this project for?",
         body: `<p class="muted">Pick one from the list or type any card name. It drives card-specific checks — e.g. Plat Charge mailers need the SK signature, other cards end with “American Express Banking Corp.”.</p>
-          <input class="inp" list="cardList" value="${esc(S.project.card || "")}" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80">${cardList()}`,
+          ${cardCombo("", S.project.card || "")}`,
         actions: [{ label: "Cancel", value: null }, { label: "Save", primary: true, collect: (m) => $("input", m).value.trim() }]
       });
       if (card === null || card === (S.project.card || "")) return;
@@ -1222,6 +1243,18 @@
   };
 
   document.addEventListener("click", (e) => {
+    const combo = e.target.closest("[data-combo]");
+    $$("[data-combo]").forEach((b) => { if (b !== combo) comboClose(b); });
+    if (combo) {
+      const opt = e.target.closest(".combo-list li");
+      const inp = $("input", combo);
+      if (opt) {
+        if (opt.hasAttribute("data-type")) { inp.value = ""; inp.focus(); comboClose(combo); return; }
+        inp.value = opt.dataset.val; comboClose(combo); inp.focus(); return;
+      }
+      if (e.target.closest(".combo-btn")) { const list = $(".combo-list", combo); list.hidden ? comboOpen(combo) : comboClose(combo); inp.focus(); }
+      return;
+    }
     const act = e.target.closest("[data-act]");
     if (act && !act.disabled) {
       e.preventDefault();
@@ -1253,12 +1286,33 @@
     const link = e.target.closest("[data-href]");
     if (link && !e.target.closest("a[href]:not([data-href]), button, select, input, label")) go(link.dataset.href);
   });
+  document.addEventListener("focusin", (e) => { const box = e.target.closest && e.target.closest("[data-combo]"); if (box && e.target.matches("input")) comboOpen(box); });
+  document.addEventListener("keydown", (e) => {
+    const box = e.target.closest && e.target.closest("[data-combo]");
+    if (!box) return;
+    const list = $(".combo-list", box), cur = $("li.on", list);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (list.hidden) comboOpen(box);
+      const all = $$("li", list), i = all.indexOf($("li.on", list));
+      const next = all[(i + (e.key === "ArrowDown" ? 1 : -1) + all.length) % all.length];
+      all.forEach((li) => li.classList.toggle("on", li === next));
+      if (next) next.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter" && !list.hidden && cur) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      cur.click();
+    } else if (e.key === "Escape" && !list.hidden) {
+      e.stopImmediatePropagation(); comboClose(box);
+    } else if (e.key === "Tab") comboClose(box);
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" || !e.target.matches("[data-href][tabindex], [data-act][tabindex]")) return;
     e.preventDefault();
     e.target.click();
   });
   document.addEventListener("input", (e) => {
+    const cbox = e.target.closest && e.target.closest("[data-combo]");
+    if (cbox) { comboOpen(cbox); return; }
     if (!S.draft) return;
     if (e.target.id === "rfNotes") { S.draft.notes = e.target.value; saveDraft(); }
     const rid = e.target.dataset && e.target.dataset.reason;

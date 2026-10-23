@@ -508,3 +508,20 @@ details.checklist:not([open]) { padding-bottom: 16px; }
 }
 .ai-badge.warn { background: var(--warn-bg); color: var(--warn); border-color: #f0dca6; }
 .new-proj label > span small { font-weight: 500; color: var(--muted); }
+
+/* Card combobox: pick from the list, or type any name */
+.combo { position: relative; }
+.combo .inp { padding-right: 40px; }
+.combo-btn { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: 6px; cursor: pointer; }
+.combo-btn .ic { transform: rotate(90deg); width: 15px; height: 15px; }
+.combo-btn:hover { background: #f1f4f8; color: var(--ink); }
+.combo-list { position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; right: 0; max-height: 300px; overflow-y: auto; margin: 0; padding: 6px;
+  list-style: none; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(16,24,40,.14); }
+.combo-list li { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-radius: 6px; font-size: 13.5px; color: var(--ink); cursor: pointer; }
+.combo-list li .ic { width: 15px; height: 15px; color: var(--muted); }
+.combo-list li:hover, .combo-list li.on { background: #eef5fd; }
+.combo-list li.combo-new { margin-top: 4px; border-top: 1px solid var(--line-soft); border-radius: 0 0 6px 6px; color: var(--amex-blue); font-weight: 600; }
+.combo-list li.combo-new .ic { color: var(--amex-blue); }
+.modal-body .combo-list { max-height: 220px; }
+.modal-box:has([data-combo]) .modal-body { overflow: visible; }
