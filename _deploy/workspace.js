@@ -15,7 +15,7 @@
     laptop: "M5 5h14v10H5zM3 19h18", flag: "M5 21V4M5 4h12l-2.5 4L17 12H5", check: "m5 12.5 4.5 4.5L19 7", x: "M6 6l12 12M18 6 6 18",
     minus: "M5 12h14", chevron: "m9 6 6 6-6 6", undo: "M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11", file: "M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8zM14 3v5h5",
     clip: "m20 11.5-8.2 8.2a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6",
-    chart: "M5 20V11M12 20V5M19 20v-8M3 20h18", pencil: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z", back: "m15 6-6 6 6 6", sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"
+    chart: "M5 20V11M12 20V5M19 20v-8M3 20h18", panel: "M4 5h16v14H4zM9.5 5v14", pencil: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z", back: "m15 6-6 6 6 6", sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"
   };
   const icon = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${ICONS[n]}"/></svg>`;
   const app = $("#app");
@@ -26,7 +26,7 @@
   const S = {
     user: lsGet("studio-user") || "", projects: [], all: null, project: null, loadedPid: null,
     mailers: [], briefs: [], reviews: [], events: [], ai: { available: false, reason: "Checking AI…" },
-    draft: null, current: null, histFilter: "all"
+    draft: null, current: null, histFilter: "all", sideHidden: lsGet("studio-side") === "hidden"
   };
   const cache = new Map();      // "mailerId:v" → { r, file, brand: { [type]: result } }
 
@@ -266,8 +266,11 @@
       </div>`;
     }
     renderSide(rt);
-    const tabs = [["upload", "upload", "Upload & Analyse"], ["briefs", "file", `Briefs <span class="tab-n">${S.briefs.length}</span>`], ["history", "chart", "History"], ["rulebook", "book", "Rulebook"]];
-    $("#tabs").innerHTML = tabs.map(([k, ic, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${icon(ic)}<span>${l}</span></a>`).join("");
+    $("#ws").classList.toggle("side-hidden", S.sideHidden);
+    const tabs = [["briefs", "file", `Briefs <span class="tab-n">${S.briefs.length}</span>`], ["upload", "upload", "Upload & Analyse"], ["history", "chart", "History"], ["rulebook", "book", "Rulebook"]];
+    $("#tabs").innerHTML = `<button type="button" class="tab-toggle" data-act="toggle-side" aria-pressed="${!S.sideHidden}"
+        title="${S.sideHidden ? "Show" : "Hide"} the side panel" aria-label="${S.sideHidden ? "Show" : "Hide"} the side panel">${icon("panel")}</button>` +
+      tabs.map(([k, ic, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${icon(ic)}<span>${l}</span></a>`).join("");
     const parts = [{ label: "Projects", href: "#/" }, { label: S.project.name, href: P() + "/upload" }];
     const tabName = { upload: "Upload & Analyse", briefs: "Briefs", history: "History", rulebook: "Rulebook" }[rt.tab];
     parts.push({ label: tabName, href: `${P()}/${rt.tab}` });
@@ -460,7 +463,7 @@
     if (!S.draft || S.draft.key !== key) S.draft = newDraft(key, m, ver, a);
     $("#mStatus").remove();
     const r = { ...a.r, marks: a.r.marks.concat(a.brand.marks, briefMarks(briefRows(m, ver, a), a.brand)) };
-    E.renderReport(r, a.file, $("#report"), { slot: true, compact: true, previewMax: 760, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
+    E.renderReport(r, a.file, $("#report"), { slot: true, compact: true, previewMax: S.sideHidden ? 960 : 760, vision: ver.vision, onVision: (marks, res) => saveVision(marks, res) });
     $("#report .report-slot").innerHTML = '<div id="checklist"></div>';
     S.focusItem = null;
     refreshMailer();
@@ -486,22 +489,20 @@
     const c = a ? compliance(m, ver, a) : { pct: storedCompliance(m, ver), note: "" };
     return `<div class="card mailer-head">
       <div class="mh-left">
-        <h2>${esc(m.name)}</h2>
+        <h2 title="${esc(m.name)}">${esc(m.name)}</h2>
         <div class="mh-meta">${esc(ver.fileName)} · ${E.fmtBytes(ver.size)} · ${ver.engine.pages} page(s) · uploaded by <b>${esc(ver.uploadedBy)}</b> ${fmtDate(ver.uploadedAt)}</div>
-        <div class="mh-status">
-          <span class="st ${st.manual.length ? "done" : "todo"}">${icon("user")}${st.manual.length ? `Manual check: ${esc(st.manualNames.join(", "))}` : "Manual check pending"}</span>
-          <span class="st ${st.final ? (st.approved ? "done" : "bad") : "todo"}">${icon("flag")}${st.final ? (st.approved ? `Final approved: ${esc(st.final.reviewers.join(", "))}` : `Changes asked: ${esc(st.final.reviewers.join(", "))}`) : "Final check pending"}</span>
-          ${st.approved ? `<button class="link" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">${icon("download")}Download final emailer</button>` : ""}
-        </div>
       </div>
       <div class="mh-score ${scoreCls(c.pct)}" title="${esc(c.note)}"><b>${c.pct}%</b><span>Compliance</span></div>
       <div class="mh-actions">
-        <label class="mini">Type <select data-change="mailer-type"><option value="marketing" ${m.type === "marketing" ? "selected" : ""}>Marketing</option><option value="servicing" ${m.type === "servicing" ? "selected" : ""}>Servicing</option></select></label>
-        <label class="mini">Version <select data-change="mailer-version">${vopts}</select></label>
+        <span class="st ${st.manual.length ? "done" : "todo"}">${icon("user")}${st.manual.length ? `Manual: ${esc(st.manualNames.join(", "))}` : "Manual pending"}</span>
+        <span class="st ${st.final ? (st.approved ? "done" : "bad") : "todo"}">${icon("flag")}${st.final ? (st.approved ? `Final: ${esc(st.final.reviewers.join(", "))}` : `Changes asked: ${esc(st.final.reviewers.join(", "))}`) : "Final pending"}</span>
+        ${st.approved ? `<button class="link" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">${icon("download")}Final emailer</button>` : ""}
         <span class="mh-spacer"></span>
-        <label class="btn ghost sm" data-drop="version" data-mid="${esc(m.id)}">${icon("upload")}New version<input type="file" accept="application/pdf,.pdf" class="vh"></label>
-        <button class="btn ghost sm" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}">${icon("download")}PDF</button>
-        <a class="btn ghost sm" href="${P()}/rulebook">${icon("book")}Rulebook</a>
+        <select data-change="mailer-type" aria-label="Mailer type" title="Mailer type"><option value="marketing" ${m.type === "marketing" ? "selected" : ""}>Marketing</option><option value="servicing" ${m.type === "servicing" ? "selected" : ""}>Servicing</option></select>
+        <select data-change="mailer-version" aria-label="Version" title="Version">${vopts}</select>
+        <label class="btn ghost sm" data-drop="version" data-mid="${esc(m.id)}" title="Upload a new version of this mailer">${icon("upload")}New version<input type="file" accept="application/pdf,.pdf" class="vh"></label>
+        <button class="btn ghost sm icon-only" data-act="download-version" data-mid="${esc(m.id)}" data-v="${ver.v}" title="Download this PDF" aria-label="Download this PDF">${icon("download")}</button>
+        <a class="btn ghost sm icon-only" href="${P()}/rulebook" title="Rulebook" aria-label="Rulebook">${icon("book")}</a>
         <button class="btn ghost sm icon-only danger-ghost" data-act="delete-mailer" data-id="${esc(m.id)}" title="Delete mailer" aria-label="Delete mailer">${icon("trash")}</button>
       </div>
       <div id="mhStatus"></div>
@@ -1100,6 +1101,13 @@
       const m = S.mailers.find((x) => x.id === el.dataset.mid);
       const v = m && m.versions.find((x) => x.v === +el.dataset.v);
       if (v) downloadFile(v.fileId, m.final && m.final.v === v.v ? v.fileName.replace(/\.pdf$/i, " - FINAL.pdf") : v.fileName);
+    },
+    "toggle-side": () => {
+      S.sideHidden = !S.sideHidden;
+      lsSet("studio-side", S.sideHidden ? "hidden" : "shown");
+      const view = $("#view");
+      if (view) delete view.dataset.mounted;
+      render();
     },
     "clear-focus": () => { S.focusItem = null; applyFocus(false); },
     "rm-reviewer": (el) => { S.draft.reviewers = S.draft.reviewers.filter((n) => n !== el.dataset.name); renderChecklist(); },
