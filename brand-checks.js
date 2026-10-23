@@ -27,7 +27,7 @@ window.BrandChecks = (() => {
     { id: "line-breaks", label: "Line breaks make sense", cat: "Copy", how: "auto" },
     { id: "card-name-single", label: "Card name on one line, never cut", cat: "Card", how: "auto" },
     { id: "card-fee", label: "Card fee as per the Card", cat: "Card", how: "ai" },
-    { id: "signature", label: "Sign-off: SK signature (Plat Charge) / AEBC (other cards)", cat: "Card", how: "ai" },
+    { id: "signature", label: "Sign-off: SK signature (Plat Charge) / AEBC (other cards)", cat: "Card", how: "auto" },
     { id: "asterisks-numbers", label: "Asterisk / footnote on every offer figure", cat: "Special Characters", how: "auto" },
     { id: "asterisks-not-linked", label: "Asterisks and footnote markers not hyperlinked", cat: "Special Characters", how: "auto" },
     { id: "asterisk-colour", label: "Asterisks the same colour as the body copy", cat: "Special Characters", how: "auto" },
@@ -421,7 +421,11 @@ window.BrandChecks = (() => {
 
     // 14. Sign-off — depends on the card, which the PDF alone can't tell us
     const aebc = /American\s+Express\s+Banking\s+Corp/i.test(joined);
-    set("signature", "review", aebc ? "“American Express Banking Corp.” sign-off found — confirm it suits this card (Plat Charge needs the SK signature)." : "No AEBC sign-off in live text — Plat Charge mailers need the SK signature image; confirm by eye.");
+    const card = (ctx.card || "").trim();
+    const platCharge = /plat\w*\s+charge|the\s+platinum\s+card|^platinum\s+card$/i.test(card);
+    if (!card) set("signature", "review", aebc ? "“American Express Banking Corp.” sign-off found. Set the project's card to decide this automatically (Plat Charge needs the SK signature)." : "No AEBC sign-off in live text. Set the project's card to decide this automatically.");
+    else if (platCharge) set("signature", aebc ? "warn" : "review", aebc ? `${card}: Plat Charge creatives close with the SK signature, not “American Express Banking Corp.” — check the sign-off.` : `${card}: confirm the SK signature image closes the body copy.`);
+    else set("signature", aebc ? "pass" : "fail", aebc ? `${card}: body copy ends with “American Express Banking Corp.”, as required.` : `${card}: the body copy must end with “American Express Banking Corp.” — not found.`);
 
     // 15. Grey — measured from the rendered pixels
     try {

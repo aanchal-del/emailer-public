@@ -15,7 +15,7 @@
     laptop: "M5 5h14v10H5zM3 19h18", flag: "M5 21V4M5 4h12l-2.5 4L17 12H5", check: "m5 12.5 4.5 4.5L19 7", x: "M6 6l12 12M18 6 6 18",
     minus: "M5 12h14", chevron: "m9 6 6 6-6 6", undo: "M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11", file: "M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8zM14 3v5h5",
     clip: "m20 11.5-8.2 8.2a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.2 8.2a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6",
-    chart: "M5 20V11M12 20V5M19 20v-8M3 20h18", panel: "M4 5h16v14H4zM9.5 5v14", pencil: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z", back: "m15 6-6 6 6 6", sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"
+    chart: "M5 20V11M12 20V5M19 20v-8M3 20h18", panel: "M4 5h16v14H4zM9.5 5v14", card: "M3 6.5h18v11H3zM3 10.5h18M7 14.5h4", pencil: "M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z", back: "m15 6-6 6 6 6", sparkle: "M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"
   };
   const icon = (n) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${ICONS[n]}"/></svg>`;
   const app = $("#app");
@@ -30,6 +30,9 @@
   };
   const cache = new Map();      // "mailerId:v" → { r, file, brand: { [type]: result } }
 
+  const CARDS = ["Platinum Reserve Credit Card", "Platinum Travel Credit Card", "Membership Rewards Credit Card", "SmartEarn Credit Card",
+    "Gold Charge Card", "Platinum Charge Card (The Platinum Card)", "Centurion Card", "Corporate Card"];
+  const cardList = () => `<datalist id="cardList">${CARDS.map((c) => `<option value="${c}">`).join("")}</datalist>`;
   const now = () => new Date().toISOString();
   const fmtDate = (iso) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -169,8 +172,9 @@
         try { old.r.pdf.destroy(); } catch (_) {}
       }
     }
-    if (!entry.brand[m.type]) entry.brand[m.type] = await C.run(entry.r, { mailerType: m.type });
-    return { r: entry.r, file: entry.file, brand: entry.brand[m.type] };
+    const bk = `${m.type}|${S.project.card || ""}`;
+    if (!entry.brand[bk]) entry.brand[bk] = await C.run(entry.r, { mailerType: m.type, card: S.project.card });
+    return { r: entry.r, file: entry.file, brand: entry.brand[bk] };
   }
   const itemsFor = (ver, brand) => C.mergeAI(brand.items, ver.aiBrand && ver.aiBrand.results);
 
@@ -233,7 +237,7 @@
     const count = (store, pid, fn) => S.all[store].filter((x) => x.projectId === pid && (!fn || fn(x))).length;
     const cards = S.projects.map((p) => {
       return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/upload" tabindex="0">
-        <div class="pc-top"><h3>${esc(p.name)}</h3>
+        <div class="pc-top"><div class="pc-title"><h3>${esc(p.name)}</h3>${p.card ? `<span class="pc-card">${icon("card")}${esc(p.card)}</span>` : ""}</div>
           <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">${icon("trash")}</button></div>
         <div class="pc-stats">
           <div><b>${count("mailers", p.id)}</b><span>Mailers</span></div>
@@ -247,11 +251,13 @@
     app.innerHTML = `<div class="dash">
       <div class="dash-head">
         <div><h1>Projects</h1><p class="muted">One project per client or campaign. Each holds its mailers, briefs and every check made on them.</p></div>
-        <form class="inline-form" data-form="new-project">
-          <input class="inp" name="name" placeholder="New project name, e.g. Plat Reserve Upgrade Sep '26" required maxlength="80">
-          <button class="btn">${icon("plus")}<span>Create project</span></button>
-        </form>
       </div>
+      <form class="card new-proj" data-form="new-project">
+        <label><span>Project name</span><input class="inp" name="name" placeholder="e.g. Plat Reserve Upgrade Sep '26" required maxlength="80"></label>
+        <label><span>Card</span><input class="inp" name="card" list="cardList" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80"></label>
+        <button class="btn">${icon("plus")}<span>Create project</span></button>
+        ${cardList()}
+      </form>
       ${S.projects.length ? `<div class="proj-grid">${cards}</div>` :
         `<div class="empty-card"><h3>No projects yet</h3><p>Create one above, then upload a mailer PDF and its brief.</p></div>`}
     </div>`;
@@ -269,7 +275,7 @@
     $("#ws").classList.toggle("side-hidden", S.sideHidden);
     const tabs = [["briefs", "file", `Briefs <span class="tab-n">${S.briefs.length}</span>`], ["upload", "upload", "Upload & Analyse"], ["history", "chart", "History"], ["rulebook", "book", "Rulebook"]];
     $("#tabs").innerHTML = `<button type="button" class="tab-toggle" data-act="toggle-side" aria-pressed="${!S.sideHidden}"
-        title="${S.sideHidden ? "Show" : "Hide"} the side panel" aria-label="${S.sideHidden ? "Show" : "Hide"} the side panel">${icon("panel")}</button>` +
+        title="${S.sideHidden ? "Show" : "Hide"} the side panel" aria-label="${S.sideHidden ? "Show" : "Hide"} the side panel">${icon("panel")}${S.sideHidden ? "<span>Show panel</span>" : ""}</button>` +
       tabs.map(([k, ic, l]) => `<a href="${P()}/${k}" class="${rt.tab === k ? "on" : ""}">${icon(ic)}<span>${l}</span></a>`).join("");
     const parts = [{ label: "Projects", href: "#/" }, { label: S.project.name, href: P() + "/upload" }];
     const tabName = { upload: "Upload & Analyse", briefs: "Briefs", history: "History", rulebook: "Rulebook" }[rt.tab];
@@ -293,7 +299,12 @@
     }).join("");
     const briefOpts = S.briefs.map((b) => `<option value="${esc(b.id)}" ${rt.tab === "briefs" && rt.id === b.id ? "selected" : ""}>P${priorityOf(b)} · ${esc(b.title)}</option>`).join("");
     $("#side").innerHTML = `
-      <div class="side-proj"><a href="#/" class="back">${icon("back")}<span>All projects</span></a><h2>${esc(S.project.name)}</h2></div>
+      <div class="side-proj">
+        <div class="side-top"><a href="#/" class="back">${icon("back")}<span>All projects</span></a>
+          <button type="button" class="side-hide" data-act="toggle-side" title="Hide this panel to give the checklist and preview more room">${icon("panel")}<span>Hide panel</span></button></div>
+        <h2>${esc(S.project.name)}</h2>
+        <button type="button" class="side-card ${S.project.card ? "" : "empty"}" data-act="edit-card" title="Which card this project is for">${icon("card")}<span>${S.project.card ? esc(S.project.card) : "Add the card"}</span>${icon("pencil")}</button>
+      </div>
       <a class="btn side-cta" href="${P()}/upload">${icon("plus")}<span>Upload mailer</span></a>
       <h3 class="side-h"><span>Mailers</span><span>${S.mailers.length}</span></h3>
       <ul class="side-list">${mailers || '<li class="side-empty">No mailers yet</li>'}</ul>
@@ -345,7 +356,7 @@
       let m = asVersionOf && S.mailers.find((x) => x.id === asVersionOf);
       if (!m) m = { id: DB.uid(), projectId: S.project.id, name: file.name.replace(/\.pdf$/i, ""), type: type || "marketing", createdAt: now(), createdBy: S.user, versions: [], final: null };
       const v = m.versions.length + 1;
-      const brand = await C.run(r, { mailerType: m.type });
+      const brand = await C.run(r, { mailerType: m.type, card: S.project.card });
       const ver = {
         v, fileId, fileName: file.name, size: file.size, uploadedAt: now(), uploadedBy: S.user,
         engine: { score: r.score, counts: r.counts, scoredCount: r.scored.length, pages: r.stats.pages },
@@ -354,7 +365,7 @@
       m.versions.push(ver);
       ver.compliance = compliance(m, ver, { r, brand }).pct;
       await DB.put("mailers", m);
-      cache.set(`${m.id}:${v}`, { r, file, brand: { [m.type]: brand } });
+      cache.set(`${m.id}:${v}`, { r, file, brand: { [`${m.type}|${S.project.card || ""}`]: brand } });
       const auto = brand.items.filter((i) => i.method === "auto" && DECIDED.includes(i.status)).length;
       await logEvent({ type: "upload", mailerId: m.id, v, text: `Uploaded “${m.name}” v${v} — handbook ${r.score}%, ${auto}/${brand.items.length} checklist items decided automatically` });
       await reloadProject(S.project.id);
@@ -440,7 +451,7 @@
     const m = S.mailers.find((x) => x.id === rt.id);
     if (!m) { view.innerHTML = `<div class="empty-card"><h3>This mailer was deleted.</h3><a href="${P()}/upload">Back to uploads</a></div>`; return; }
     const ver = (rt.v && m.versions.find((x) => x.v === rt.v)) || latest(m);
-    const key = `${m.id}:${ver.v}:${m.type}`;
+    const key = `${m.id}:${ver.v}:${m.type}:${S.project.card || ""}`;
     // Re-mount (and redraw the preview boxes) when the briefs change; the draft survives.
     const mkey = `${key}|${briefSig(m)}`;
     if (view.dataset.mounted === mkey && S.current && S.current.key === key) {
@@ -1102,6 +1113,22 @@
       const v = m && m.versions.find((x) => x.v === +el.dataset.v);
       if (v) downloadFile(v.fileId, m.final && m.final.v === v.v ? v.fileName.replace(/\.pdf$/i, " - FINAL.pdf") : v.fileName);
     },
+    "edit-card": async () => {
+      const card = await modal({
+        title: "Which card is this project for?",
+        body: `<p class="muted">Used for card-specific checks — e.g. Plat Charge mailers need the SK signature, other cards end with “American Express Banking Corp.”.</p>
+          <input class="inp" list="cardList" value="${esc(S.project.card || "")}" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80">${cardList()}`,
+        actions: [{ label: "Cancel", value: null }, { label: "Save", primary: true, collect: (m) => $("input", m).value.trim() }]
+      });
+      if (card === null || card === (S.project.card || "")) return;
+      S.project.card = card;
+      await DB.put("projects", S.project);
+      await logEvent({ type: "project", text: card ? `Set the card for “${S.project.name}” to ${card}` : `Cleared the card for “${S.project.name}”` });
+      await reloadProject(S.project.id);
+      const view = $("#view");
+      if (view) delete view.dataset.mounted;
+      render();
+    },
     "toggle-side": () => {
       S.sideHidden = !S.sideHidden;
       lsSet("studio-side", S.sideHidden ? "hidden" : "shown");
@@ -1218,11 +1245,11 @@
     try {
       if (f.dataset.form === "new-project") {
         await ensureUser();
-        const p = { id: DB.uid(), name: data.name.trim(), createdAt: now(), createdBy: S.user };
+        const p = { id: DB.uid(), name: data.name.trim(), card: (data.card || "").trim(), createdAt: now(), createdBy: S.user };
         if (!p.name) return;
         await DB.put("projects", p);
         S.project = p;
-        await logEvent({ type: "project", text: `Created project “${p.name}”` });
+        await logEvent({ type: "project", text: `Created project “${p.name}”${p.card ? ` for ${p.card}` : ""}` });
         go(`#/p/${encodeURIComponent(p.id)}/upload`);
       } else if (f.dataset.form === "add-reviewer") {
         const who = (data.who || "").trim();

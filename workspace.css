@@ -103,14 +103,20 @@ textarea.inp { height: auto; padding: 10px 12px; line-height: 1.45; resize: vert
 .dash-head { display: flex; gap: 20px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 22px; }
 .dash-head h1 { margin: 0 0 4px; font-size: 28px; line-height: 1.2; color: var(--amex-dark); }
 .dash-head p { margin: 0; max-width: 520px; }
-.inline-form { display: flex; gap: 8px; align-items: center; min-width: min(460px, 100%); flex: 1; max-width: 560px; }
-.inline-form .inp { flex: 1; min-width: 0; }
+/* New project: name + card side by side, button on the same baseline */
+.new-proj { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 16px 18px; margin-bottom: 20px; }
+.new-proj label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.new-proj label > span { font-size: 12.5px; font-weight: 700; color: #374151; }
 .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .proj-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; cursor: pointer;
   box-shadow: var(--shadow); transition: border-color .15s, transform .15s; display: flex; flex-direction: column; gap: 12px; }
 .proj-card:hover, .proj-card:focus-visible { border-color: var(--amex-blue); transform: translateY(-1px); }
 .pc-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 32px; }
 .pc-top h3 { margin: 0; font-size: 17px; color: var(--amex-dark); }
+.pc-title { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pc-card { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; height: 24px; padding: 0 9px; border-radius: 999px;
+  background: #eef3fb; color: var(--amex-dark); font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.pc-card .ic { width: 14px; height: 14px; }
 .pc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .pc-stats div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #f5f7fa; border-radius: 8px; padding: 8px 4px; }
 .pc-stats b { font-size: 18px; line-height: 1.1; color: var(--amex-dark); }
@@ -121,6 +127,18 @@ textarea.inp { height: auto; padding: 10px 12px; line-height: 1.45; resize: vert
 .ws { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: calc(100vh - 58px); }
 .ws-side { background: #fff; border-right: 1px solid var(--line); padding: 16px 14px 40px; position: sticky; top: 58px;
   height: calc(100vh - 58px); overflow-y: auto; }
+.side-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.side-hide { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r-ctl);
+  background: #fff; color: #4b5563; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.side-hide:hover { background: #f1f4f8; color: var(--ink); }
+.side-hide .ic { width: 14px; height: 14px; }
+.side-card { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 32px; margin: -4px 0 12px; padding: 0 10px; border: 1px solid #d7e3f4;
+  border-radius: var(--r-ctl); background: #eef3fb; color: var(--amex-dark); font: inherit; font-size: 12.5px; font-weight: 600; text-align: left; cursor: pointer; }
+.side-card span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-card .ic { width: 14px; height: 14px; }
+.side-card .ic:last-child { color: var(--muted); }
+.side-card.empty { background: #fff; border-style: dashed; color: var(--amex-blue); }
+.side-card:hover { border-color: #9cc3ea; }
 .side-proj .back { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--amex-blue); text-decoration: none; font-weight: 600; }
 .side-proj .back .ic { width: 14px; height: 14px; }
 .side-proj h2 { margin: 8px 0 12px; font-size: 18px; line-height: 1.3; color: var(--amex-dark); }
@@ -146,7 +164,8 @@ textarea.inp { height: auto; padding: 10px 12px; line-height: 1.45; resize: vert
 .ws-main { padding: 0 24px 60px; min-width: 0; }
 .ws-tabs { display: flex; align-items: center; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 -24px 18px; padding: 0 24px 0 12px; background: #fff;
   position: sticky; top: 58px; z-index: 20; overflow-x: auto; }
-.tab-toggle { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; margin-right: 6px; padding: 0; flex: none;
+.tab-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 34px; height: 34px; margin-right: 6px; padding: 0 8px; flex: none;
+  font: inherit; font-size: 13px; font-weight: 600;
   border: 1px solid var(--line); border-radius: var(--r-ctl); background: #fff; color: #4b5563; cursor: pointer; }
 .tab-toggle:hover { background: #f1f4f8; color: var(--ink); }
 .tab-toggle[aria-pressed="false"] { background: #eef5fd; border-color: #9cc3ea; color: var(--amex-blue); }
@@ -456,6 +475,8 @@ details.checklist:not([open]) { padding-bottom: 16px; }
   .ws-crumbs { display: none; }
   .ws-top { justify-content: space-between; padding: 0 16px; }
   .rf-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .new-proj { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .new-proj .btn { grid-column: 1 / -1; }
   .rf-row:has(textarea) .rf-l { padding-top: 0; }
   .hrow { grid-template-columns: minmax(0, 1fr); }
   .reqs li { grid-template-columns: 76px minmax(0, 1fr) 26px; }
@@ -467,7 +488,7 @@ details.checklist:not([open]) { padding-bottom: 16px; }
   .ai-badge span, .user-chip span { display: none; }
   .ai-badge, .user-chip { width: 32px; padding: 0; justify-content: center; }
   .dash { padding: 20px 16px 50px; }
-  .inline-form { flex-direction: column; align-items: stretch; min-width: 100%; }
+  .new-proj { grid-template-columns: minmax(0, 1fr); }
   .pc-stats { grid-template-columns: repeat(2, 1fr); }
   .mailer-head { grid-template-columns: minmax(0, 1fr); }
   .mh-score { justify-self: start; }
