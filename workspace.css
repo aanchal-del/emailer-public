@@ -506,3 +506,5 @@ details.checklist:not([open]) { padding-bottom: 16px; }
   .ws { display: block; }
   .review-split { display: block; }
 }
+.ai-badge.warn { background: var(--warn-bg); color: var(--warn); border-color: #f0dca6; }
+.new-proj label > span small { font-weight: 500; color: var(--muted); }

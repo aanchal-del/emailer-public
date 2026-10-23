@@ -22,6 +22,7 @@
 
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const lsDel = (k) => { try { localStorage.removeItem(k); } catch (_) {} };
 
   const S = {
     user: lsGet("studio-user") || "", projects: [], all: null, project: null, loadedPid: null,
@@ -32,7 +33,10 @@
 
   const CARDS = ["Platinum Reserve Credit Card", "Platinum Travel Credit Card", "Membership Rewards Credit Card", "SmartEarn Credit Card",
     "Gold Charge Card", "Platinum Charge Card (The Platinum Card)", "Centurion Card", "Corporate Card"];
-  const cardList = () => `<datalist id="cardList">${CARDS.map((c) => `<option value="${c}">`).join("")}</datalist>`;
+  const cardList = () => {
+    const all = uniq(CARDS.concat(S.projects.map((p) => p.card), S.project ? [S.project.card] : []));
+    return `<datalist id="cardList">${all.map((c) => `<option value="${esc(c)}">`).join("")}</datalist>`;
+  };
   const now = () => new Date().toISOString();
   const fmtDate = (iso) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const fmtDay = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -254,7 +258,7 @@
       </div>
       <form class="card new-proj" data-form="new-project">
         <label><span>Project name</span><input class="inp" name="name" placeholder="e.g. Plat Reserve Upgrade Sep '26" required maxlength="80"></label>
-        <label><span>Card</span><input class="inp" name="card" list="cardList" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80"></label>
+        <label><span>Card <small>— pick one or type any card name</small></span><input class="inp" name="card" list="cardList" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80"></label>
         <button class="btn">${icon("plus")}<span>Create project</span></button>
         ${cardList()}
       </form>
@@ -426,9 +430,34 @@
     for (const i of itemsFor(ver, a.brand)) seed(i.id, DECIDED.includes(i.status) ? i.status : null);
     for (const r of briefRows(m, ver, a)) seed(r.id, r.suggested);
     const keep = S.draft && S.draft.key === key ? S.draft : null;
-    return { key, decisions, reasons, touched: {}, last, reviewers: keep ? keep.reviewers : uniq([S.user]),
-             stage: keep ? keep.stage : "manual", notes: "", verdict: "approved" };
+    const d = { key, decisions, reasons, touched: {}, last, reviewers: keep ? keep.reviewers : uniq([S.user]),
+                stage: keep ? keep.stage : "manual", notes: "", verdict: "approved" };
+    let saved = null;
+    try { saved = JSON.parse(lsGet(draftKey(key)) || "null"); } catch (_) {}
+    // A draft older than the latest submitted check is stale — that check already settled it.
+    const lastAt = Object.values(last).reduce((x, v) => (v.at > x ? v.at : x), "");
+    if (saved && saved.at && lastAt && saved.at < lastAt) { lsDel(draftKey(key)); saved = null; }
+    if (saved && !keep) {
+      for (const id of Object.keys(saved.touched || {}))
+        if (saved.decisions[id]) { d.decisions[id] = saved.decisions[id]; d.reasons[id] = saved.reasons[id] || ""; d.touched[id] = true; }
+      Object.assign(d, { notes: saved.notes || "", stage: saved.stage || d.stage, verdict: saved.verdict || d.verdict,
+                         reviewers: saved.reviewers && saved.reviewers.length ? saved.reviewers : d.reviewers,
+                         restoredAt: Object.keys(saved.touched || {}).length || saved.notes ? saved.at : null });
+    }
+    return d;
   }
+
+  const draftKey = (key) => "studio-draft:" + key;
+  let draftTimer = null;
+  function saveDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const d = S.draft;
+      if (d) lsSet(draftKey(d.key), JSON.stringify({ decisions: d.decisions, reasons: d.reasons, touched: d.touched, notes: d.notes,
+        reviewers: d.reviewers, stage: d.stage, verdict: d.verdict, at: now() }));
+    }, 250);
+  }
+  window.addEventListener("beforeunload", () => { if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; const d = S.draft; if (d) lsSet(draftKey(d.key), JSON.stringify({ decisions: d.decisions, reasons: d.reasons, touched: d.touched, notes: d.notes, reviewers: d.reviewers, stage: d.stage, verdict: d.verdict, at: now() })); } });
 
   // Share of checks that pass on the latest decisions (N/A left out). 100% once the final
   // professional check approves the version.
@@ -628,7 +657,7 @@
           : `<p class="cl-hint">Add a brief and every requirement in it is checked here, line by line.</p><a class="btn sm" href="${P()}/briefs">${icon("plus")}Add a brief</a>`}
       </details>
       <section class="card checklist">
-        <div class="cl-head"><h3>Submit the check</h3></div>
+        <div class="cl-head"><h3>Submit the check</h3>${d.restoredAt ? `<span class="sp b-warn" title="Saved on this device">Unsent work from ${fmtDate(d.restoredAt)} restored</span>` : ""}</div>
         <div class="review-form">
           <div class="rf-row"><span class="rf-l">Stage</span>
             <div class="seg big"><button type="button" class="${d.stage === "manual" ? "on" : ""}" data-stage="manual">${icon("user")}Manual check</button><button type="button" class="${d.stage === "final" ? "on" : ""}" data-stage="final">${icon("flag")}Final professional check</button></div></div>
@@ -752,9 +781,11 @@
     await logEvent({ type: "review", mailerId: m.id, v: ver.v, reviewId: review.id, by: who,
       text: `${what} on “${m.name}” v${ver.v} by ${who} — ${tally.pass} pass, ${tally.fail} fail` +
         (bRows.length ? ` · brief ${briefTally.pass}/${bRows.length - briefTally.na} met` : "") + ` · ${pct}% compliant` });
+    clearTimeout(draftTimer); draftTimer = null;
+    lsDel(draftKey(d.key));
     await reloadProject(S.project.id);
     S.draft = { ...newDraft(S.current.key, m, ver, a), reviewers: d.reviewers, stage: d.stage };
-    toast(`${what} saved · ${pct}% compliant`);
+    toast(DB.sync.pending ? `${what} saved on this device — it will reach everyone when you're back online` : `${what} saved · ${pct}% compliant`);
     render();
   }
 
@@ -1116,7 +1147,7 @@
     "edit-card": async () => {
       const card = await modal({
         title: "Which card is this project for?",
-        body: `<p class="muted">Used for card-specific checks — e.g. Plat Charge mailers need the SK signature, other cards end with “American Express Banking Corp.”.</p>
+        body: `<p class="muted">Pick one from the list or type any card name. It drives card-specific checks — e.g. Plat Charge mailers need the SK signature, other cards end with “American Express Banking Corp.”.</p>
           <input class="inp" list="cardList" value="${esc(S.project.card || "")}" placeholder="e.g. Platinum Reserve Credit Card" maxlength="80">${cardList()}`,
         actions: [{ label: "Cancel", value: null }, { label: "Save", primary: true, collect: (m) => $("input", m).value.trim() }]
       });
@@ -1137,7 +1168,7 @@
       render();
     },
     "clear-focus": () => { S.focusItem = null; applyFocus(false); },
-    "rm-reviewer": (el) => { S.draft.reviewers = S.draft.reviewers.filter((n) => n !== el.dataset.name); renderChecklist(); },
+    "rm-reviewer": (el) => { S.draft.reviewers = S.draft.reviewers.filter((n) => n !== el.dataset.name); saveDraft(); renderChecklist(); },
     "submit-review": () => submitReview(),
     "review-detail": (el) => reviewDetail(el.dataset.id),
     "event-detail": (el) => eventDetail(el.dataset.id),
@@ -1209,15 +1240,16 @@
       const id = dec.closest(".cl-row").dataset.item;
       S.draft.decisions[id] = dec.dataset.dec;
       S.draft.touched[id] = true;
+      saveDraft();
       refreshRow(id);
       const inp = $(`#checklist input[data-reason="${CSS.escape(id)}"]`);
       if (inp && !inp.value) inp.focus();
       return;
     }
     const stage = e.target.closest("[data-stage]");
-    if (stage) { S.draft.stage = stage.dataset.stage; return renderChecklist(); }
+    if (stage) { S.draft.stage = stage.dataset.stage; saveDraft(); return renderChecklist(); }
     const verdict = e.target.closest("[data-verdict]");
-    if (verdict) { S.draft.verdict = verdict.dataset.verdict; return renderChecklist(); }
+    if (verdict) { S.draft.verdict = verdict.dataset.verdict; saveDraft(); return renderChecklist(); }
     const link = e.target.closest("[data-href]");
     if (link && !e.target.closest("a[href]:not([data-href]), button, select, input, label")) go(link.dataset.href);
   });
@@ -1228,10 +1260,11 @@
   });
   document.addEventListener("input", (e) => {
     if (!S.draft) return;
-    if (e.target.id === "rfNotes") S.draft.notes = e.target.value;
+    if (e.target.id === "rfNotes") { S.draft.notes = e.target.value; saveDraft(); }
     const rid = e.target.dataset && e.target.dataset.reason;
     if (rid) {
       S.draft.reasons[rid] = e.target.value;
+      saveDraft();
       if (e.target.value.trim()) { e.target.closest(".cl-why").classList.remove("need"); e.target.closest(".cl-row").classList.remove("need"); }
     }
   });
@@ -1253,7 +1286,7 @@
         go(`#/p/${encodeURIComponent(p.id)}/upload`);
       } else if (f.dataset.form === "add-reviewer") {
         const who = (data.who || "").trim();
-        if (who && !S.draft.reviewers.includes(who)) S.draft.reviewers.push(who);
+        if (who && !S.draft.reviewers.includes(who)) { S.draft.reviewers.push(who); saveDraft(); }
         renderChecklist();
         const inp = $('#checklist input[name="who"]');
         if (inp) inp.focus();
@@ -1371,15 +1404,30 @@
 
   function renderStoreBadge() {
     const b = $("#storeBadge");
-    const shared = DB.mode === "shared";
+    const shared = DB.mode === "shared", q = DB.sync;
+    if (shared && q.pending) {
+      b.className = "ai-badge warn";
+      b.innerHTML = `${icon("upload")}<span>${q.syncing ? "Syncing" : "Offline"} · ${q.pending} waiting</span>`;
+      b.title = "Changes are kept on this device and sent as soon as the connection is back";
+      return;
+    }
     b.className = "ai-badge " + (shared ? "on store" : "off");
     b.innerHTML = shared ? `${icon("users")}<span>Shared</span>` : `${icon("laptop")}<span>This browser only</span>`;
     b.title = shared ? "Everyone using this site sees the same projects" : "No shared storage here — projects are saved in this browser only";
   }
+  let lastSyncError = "", wasPending = 0;
+  DB.onSync((st) => {
+    renderStoreBadge();
+    if (st.lastError && st.lastError !== lastSyncError) { lastSyncError = st.lastError; toast(st.lastError, "err"); }
+    if (wasPending && !st.pending && !st.syncing) { toast("Back online — everything is synced"); if (S.loadedPid) reloadProject(S.loadedPid).then(render); }
+    wasPending = st.pending;
+  });
   $("#storeBadge").addEventListener("click", () => modal({
     title: DB.mode === "shared" ? "Shared workspace" : "Saved in this browser only",
     body: DB.mode === "shared"
-      ? "<p>Projects, mailers, briefs, checks and history are stored on the server, so everyone with the link sees and edits the same data. Changes made by others appear within about 15 seconds.</p><p class='muted'>Anyone with the link can see and change everything here.</p>"
+      ? `<p>Projects, mailers, briefs, checks and history are stored on the server, so everyone with the link sees and edits the same data. Changes made by others appear within about 15 seconds.</p>
+         <p><b>If the connection drops:</b> everything already saved stays safe. Ticks, reasons and notes you haven't submitted are kept on this device as you type. Anything you submit or upload while offline waits here and is sent automatically when you're back online${DB.sync.pending ? ` — <b>${DB.sync.pending} change(s) waiting right now</b>` : ""}.</p>
+         <p class='muted'>Anyone with the link can see and change everything here.</p>`
       : "<p>This copy of the site has no shared storage, so projects are kept in this browser and other people won't see them.</p><p>Open the shared site (Netlify, linked to GitHub) or run <code>./start.sh</code> to share data.</p>"
   }));
 
