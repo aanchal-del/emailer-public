@@ -235,6 +235,7 @@ window.BrandChecks = (() => {
     };
     const noText = "Copy is mostly images, so this can't be read from the PDF.";
     const quote = (m) => `“${E().trim(m[0].replace(/\s+/g, " "), 60)}”`;
+    const around = (pos, len) => `“…${joined.slice(Math.max(0, pos - 22), pos + len + 14).replace(/\s+/g, " ").trim()}…”`;
 
     // 1. Power of Trust
     const pot = find(/(india'?s )?most trusted credit card brand|power of trust/gi);
@@ -509,7 +510,6 @@ window.BrandChecks = (() => {
     }
     set("line-breaks", dangling.length ? "warn" : "pass", dangling.length ? `${dangling.length} line(s) end on a word that belongs with the next line: ${dangling.slice(0, 3).map((l) => `“…${l.text.slice(-28)}”`).join(", ")}.` : "No line ends on a dangling word (basic check — awkward breaks inside images aren't visible here).");
 
-    const around = (pos, len) => `“…${joined.slice(Math.max(0, pos - 22), pos + len + 14).replace(/\s+/g, " ").trim()}…”`;
 
     // Pre-header alignment and the "No images? View this online." copy
     const voRe = /no images\??[^\n]*/i;
