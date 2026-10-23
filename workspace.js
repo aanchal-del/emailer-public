@@ -109,6 +109,11 @@
     actions: [{ label: "Cancel", value: null }, { label: ok, primary: true, danger, value: true }]
   });
 
+  const askName = (title, value) => modal({
+    title, body: `<input class="inp" value="${esc(value)}" maxlength="100">`,
+    actions: [{ label: "Cancel", value: null }, { label: "Save", primary: true, collect: (m) => $("input", m).value.trim() }]
+  });
+
   async function ensureUser(force) {
     if (S.user && !force) return S.user;
     const name = await modal({
@@ -264,7 +269,8 @@
     const cards = S.projects.map((p) => {
       return `<article class="proj-card" data-href="#/p/${encodeURIComponent(p.id)}/briefs" tabindex="0">
         <div class="pc-top"><div class="pc-title"><h3>${esc(p.name)}</h3>${p.card ? `<span class="pc-card">${icon("card")}${esc(p.card)}</span>` : ""}</div>
-          <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">${icon("trash")}</button></div>
+          <div class="pc-actions"><button class="icon-btn" data-act="rename-project" data-id="${esc(p.id)}" title="Rename project" aria-label="Rename project">${icon("pencil")}</button>
+          <button class="icon-btn" data-act="delete-project" data-id="${esc(p.id)}" title="Delete project" aria-label="Delete project">${icon("trash")}</button></div></div>
         <div class="pc-stats">
           <div><b>${count("mailers", p.id)}</b><span>Mailers</span></div>
           <div><b>${count("briefs", p.id)}</b><span>Briefs</span></div>
@@ -327,7 +333,7 @@
       <div class="side-proj">
         <div class="side-top"><a href="#/" class="back">${icon("back")}<span>All projects</span></a>
           <button type="button" class="side-hide" data-act="toggle-side" title="Hide this panel to give the checklist and preview more room">${icon("panel")}<span>Hide panel</span></button></div>
-        <h2>${esc(S.project.name)}</h2>
+        <div class="side-title"><h2>${esc(S.project.name)}</h2><button class="icon-btn sm" data-act="rename-project" data-id="${esc(S.project.id)}" title="Rename project" aria-label="Rename project">${icon("pencil")}</button></div>
         <button type="button" class="side-card ${S.project.card ? "" : "empty"}" data-act="edit-card" title="Which card this project is for">${icon("card")}<span>${S.project.card ? esc(S.project.card) : "Add the card"}</span>${icon("pencil")}</button>
       </div>
       <a class="btn side-cta" href="${P()}/upload">${icon("plus")}<span>Upload mailer</span></a>
@@ -550,7 +556,7 @@
     const c = a ? compliance(m, ver, a) : { pct: storedCompliance(m, ver), note: "" };
     return `<div class="card mailer-head">
       <div class="mh-left">
-        <h2 title="${esc(m.name)}">${esc(m.name)}</h2>
+        <div class="mh-title"><h2 title="${esc(m.name)}">${esc(m.name)}</h2><button class="icon-btn sm" data-act="rename-mailer" data-id="${esc(m.id)}" title="Rename mailer" aria-label="Rename mailer">${icon("pencil")}</button></div>
         <div class="mh-meta">${esc(ver.fileName)} · ${E.fmtBytes(ver.size)} · ${ver.engine.pages} page(s) · uploaded by <b>${esc(ver.uploadedBy)}</b> ${fmtDate(ver.uploadedAt)}</div>
       </div>
       <div class="mh-score ${scoreCls(c.pct)}" title="${esc(c.note)}"><b>${c.pct}%</b><span>Compliance</span></div>
@@ -1205,6 +1211,35 @@
       await logEvent({ type: "brief", text: `Deleted brief “${b.title}”` });
       await reloadProject(S.project.id);
       go(P() + "/briefs");
+    },
+    "rename-project": async (el) => {
+      const p = (S.project && S.project.id === el.dataset.id) ? S.project : S.projects.find((x) => x.id === el.dataset.id);
+      if (!p) return;
+      const name = await askName("Rename project", p.name);
+      if (!name || name === p.name) return;
+      const old = p.name;
+      p.name = name;
+      await DB.put("projects", p);
+      const prev = S.project;
+      S.project = p;
+      await logEvent({ type: "project", text: `Renamed project “${old}” to “${name}”` });
+      S.project = prev && prev.id === p.id ? p : prev;
+      if (S.loadedPid === p.id) await reloadProject(p.id);
+      toast("Project renamed");
+      render();
+    },
+    "rename-mailer": async (el) => {
+      const m = S.mailers.find((x) => x.id === el.dataset.id);
+      if (!m) return;
+      const name = await askName("Rename mailer", m.name);
+      if (!name || name === m.name) return;
+      const old = m.name;
+      m.name = name;
+      await DB.put("mailers", m);
+      await logEvent({ type: "upload", mailerId: m.id, text: `Renamed mailer “${old}” to “${name}”` });
+      await reloadProject(S.project.id);
+      toast("Mailer renamed");
+      render();
     },
     "brief-rename": async () => {
       const b = selectedBrief();

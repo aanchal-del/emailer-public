@@ -525,3 +525,11 @@ details.checklist:not([open]) { padding-bottom: 16px; }
 .combo-list li.combo-new .ic { color: var(--amex-blue); }
 .modal-body .combo-list { max-height: 220px; }
 .modal-box:has([data-combo]) .modal-body { overflow: visible; }
+
+/* Rename controls beside names */
+.pc-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.side-title, .mh-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.side-title h2 { flex: 1; min-width: 0; }
+.mh-title h2 { min-width: 0; }
+.side-proj .side-title { margin: 8px 0 12px; }
+.side-proj .side-title h2 { margin: 0; }
