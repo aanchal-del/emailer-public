@@ -1297,6 +1297,34 @@
       Promise.resolve().then(() => actions[act.dataset.act](act)).catch((err) => { console.error(err); toast(err.message, "err"); });
       return;
     }
+    // Click anywhere on the emailer preview → jump to the nearest check in the checklist.
+    // Boxes tied to a check go straight to it; the rest (text blocks, images) fall back to
+    // the closest check box on that page.
+    const pg = e.target.closest("#preview .pv-page");
+    if (pg) {
+      const own = e.target.closest(".pv-mark[data-item]");
+      let id = own && own.dataset.item;
+      // Handbook boxes (font sizes, CTAs, images) aren't tied to one brand check; they all feed "Mobile-ready".
+      if (!id && e.target.closest(".pv-mark:not(.ai)")) id = "mobile";
+      if (!id) {
+        let best = null, bestD = Infinity;
+        for (const el of $$(".pv-mark[data-item]", pg)) {
+          const r = el.getBoundingClientRect();
+          if (!r.width) continue;   // hidden by a legend toggle
+          const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+          const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+          const dist = Math.hypot(dx, dy * 1.5) + (r.width * r.height) / 1e6;   // smaller box wins a tie
+          if (dist < bestD) { bestD = dist; best = el; }
+        }
+        id = best && best.dataset.item;
+      }
+      const row = id && $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
+      if (!row) { toast("No checklist item for this spot.", "err"); return; }
+      S.focusItem = id;
+      applyFocus(false);
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const nm = e.target.closest("#checklist .cl-name");
     if (nm) {
       const id = nm.closest(".cl-row").dataset.item;

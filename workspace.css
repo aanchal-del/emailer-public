@@ -224,7 +224,7 @@ textarea.inp { height: auto; padding: 10px 12px; line-height: 1.45; resize: vert
 #mhStatus:empty { display: none; }
 
 /* ---------- checklist (left) + preview big enough to read (right) ---------- */
-.review-split { display: grid; grid-template-columns: minmax(0, 1fr) clamp(600px, 52%, 780px); gap: 20px; align-items: start; }
+.review-split { display: grid; grid-template-columns: minmax(0, 1fr) clamp(360px, 46%, 780px); gap: 20px; align-items: start; }
 .review-split .report-slot { min-width: 0; container-type: inline-size; }
 .review-split .pv-side { position: sticky; top: 124px; max-height: calc(100vh - 136px); overflow-y: auto; min-width: 0;
   border-radius: var(--radius); }
@@ -457,9 +457,9 @@ details.checklist:not([open]) { padding-bottom: 16px; }
   .review-split { grid-template-columns: minmax(0, 1fr); }
   .review-split .pv-side { order: -1; position: static; max-height: none; }
 }
-.ws.side-hidden .review-split { grid-template-columns: minmax(0, 1fr) clamp(640px, 56%, 960px); }
+.ws.side-hidden .review-split { grid-template-columns: minmax(0, 1fr) clamp(380px, 50%, 960px); }
 @media (max-width: 1300px) and (min-width: 1101px) {
-  .ws.side-hidden .review-split { grid-template-columns: minmax(0, 1fr) 600px; }
+  .ws.side-hidden .review-split { grid-template-columns: minmax(0, 1fr) clamp(360px, 46%, 600px); }
   .ws.side-hidden .review-split .pv-side { order: 0; position: sticky; top: 124px; max-height: calc(100vh - 136px); }
 }
 @media (max-width: 1100px) {
@@ -533,3 +533,4 @@ details.checklist:not([open]) { padding-bottom: 16px; }
 .mh-title h2 { min-width: 0; }
 .side-proj .side-title { margin: 8px 0 12px; }
 .side-proj .side-title h2 { margin: 0; }
+.pv-mark, .pv-page { cursor: pointer; }

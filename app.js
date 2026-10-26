@@ -1296,14 +1296,15 @@
       const wrap = preview.querySelectorAll(".pv-page")[m.page - 1];
       if (!wrap) continue;
       // Box coords are pixels of the image we sent — rescale to the rendered page.
-      const k = wrap.querySelector("canvas").clientWidth / m.imgW;
+      const cv = wrap.querySelector("canvas");
+      const imgH = m.imgH || (cv.height / cv.width) * m.imgW;
       const [x0, y0, x1, y1] = m.rect;
       const el = document.createElement("div");
       el.className = `pv-mark ai ${m.kind}`;
-      el.style.left = Math.min(x0, x1) * k + "px";
-      el.style.top = Math.min(y0, y1) * k + "px";
-      el.style.width = Math.abs(x1 - x0) * k + "px";
-      el.style.height = Math.abs(y1 - y0) * k + "px";
+      el.style.left = Math.min(x0, x1) / m.imgW * 100 + "%";
+      el.style.top = Math.min(y0, y1) / imgH * 100 + "%";
+      el.style.width = Math.abs(x1 - x0) / m.imgW * 100 + "%";
+      el.style.height = Math.abs(y1 - y0) / imgH * 100 + "%";
       const tag = document.createElement("span");
       tag.className = "pv-tag";
       tag.textContent = m.label;
@@ -1357,14 +1358,16 @@
       const canvas = document.createElement("canvas");
       canvas.width = Math.round(vp.width * ratio);
       canvas.height = Math.round(vp.height * ratio);
-      canvas.style.width = vp.width + "px";
-      canvas.style.height = vp.height + "px";
+      // Fluid: the canvas shrinks with its column; marks are percentages of the page.
+      canvas.style.width = "100%";
+      canvas.style.height = "auto";
       await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp,
         transform: [ratio, 0, 0, ratio, 0, 0] }).promise;
 
       const wrap = document.createElement("div");
       wrap.className = "pv-page";
-      wrap.style.width = vp.width + "px";
+      wrap.style.width = "100%";
+      wrap.style.maxWidth = vp.width + "px";
       wrap.appendChild(canvas);
 
       for (const m of marks.filter((m) => m.page === p)) {
@@ -1381,10 +1384,10 @@
         const el = document.createElement("div");
         el.className = "pv-mark " + m.kind;
         if (m.item) el.dataset.item = m.item;
-        el.style.left = (left - 2) + "px";
-        el.style.top = (top - 2) + "px";
-        el.style.width = (w + 4) + "px";
-        el.style.height = (h + 4) + "px";
+        el.style.left = ((left - 2) / vp.width * 100) + "%";
+        el.style.top = ((top - 2) / vp.height * 100) + "%";
+        el.style.width = ((w + 4) / vp.width * 100) + "%";
+        el.style.height = ((h + 4) / vp.height * 100) + "%";
         // Merged labels can run to 70+ characters, which no position on the page can
         // fit. Show a readable stub and keep the full text on hover.
         const short = trim(m.label, 46);
