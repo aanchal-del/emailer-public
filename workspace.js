@@ -743,7 +743,9 @@
     if (!id) return;
     const row = $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
     if (row) row.classList.add("focus");
-    const hits = $$(".pv-mark", pv).filter((el) => el.dataset.item === id);
+    let hits = $$(".pv-mark", pv).filter((el) => el.dataset.item === id);
+    const located = !hits.length && !id.startsWith("brief:") ? artworkMarks(id, pv) : [];
+    if (located.length) hits = located;
     hits.forEach((el) => el.classList.add("focus"));
     // A check judged from the whole mailer has no spot to show: frame every page instead of dimming them all.
     if (!hits.length) {
@@ -758,9 +760,33 @@
     const bar = document.createElement("div");
     bar.id = "pvFocus";
     bar.className = "pv-focus";
-    bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : none}</span><button type="button" data-act="clear-focus">${icon("x")}Show all</button>`;
+    bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview${located.length ? " (found by position)" : ""}` : none}</span><button type="button" data-act="clear-focus">${icon("x")}Show all</button>`;
     $(".pv-legend", pv).before(bar);
     if (scroll && hits.length) hits[0].scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /* Checks about artwork or the whole mailer have no text match, but the thing is on the page:
+     find its boxes from what was detected (images by size and position, handbook warnings). */
+  function artworkMarks(id, pv) {
+    const page = $(".pv-page", pv);
+    if (!page) return [];
+    const pr = page.getBoundingClientRect();
+    const loose = $$(".pv-mark:not(.ai)", pv).filter((el) => !el.dataset.item);
+    const info = (el) => { const r = el.getBoundingClientRect(); return { el, w: r.width / pr.width, top: (r.top - pr.top) / pr.height, left: r.left - pr.left, area: r.width * r.height }; };
+    const imgs = loose.filter((el) => /^(logo\/stencil|image|\d+×\d+px asset) ?/.test(el.title) || /wider than page|oversampled/.test(el.title)).map(info);
+    if (id === "mobile") {
+      const bad = loose.filter((el) => el.classList.contains("fail") || el.classList.contains("warn"));
+      return bad.length ? bad : loose;
+    }
+    if (id === "logo-registered" || id === "dll-colour") {
+      const top = imgs.filter((x) => x.top < 0.15 && x.w < 0.5).sort((a, b) => a.left - b.left);
+      const pick = id === "logo-registered" ? top[0] : (top[1] || top[0]);
+      return pick ? [pick.el] : [];
+    }
+    if (id === "indian-imagery" || id === "benefits") return imgs.filter((x) => x.w > 0.25).map((x) => x.el);
+    if (id === "icons-not-boxes") return imgs.filter((x) => x.w < 0.12).map((x) => x.el);
+    if (id === "header-grammar") return loose.filter((el) => /headline/.test(el.title));
+    return [];
   }
 
   /* A box with no checklist row of its own (handbook measurement, AI vision): show its own message. */
@@ -1338,28 +1364,25 @@
     // the closest check box on that page.
     const pg = e.target.closest("#preview .pv-page");
     if (pg) {
-      const own = e.target.closest(".pv-mark[data-item]");
-      let id = own && own.dataset.item;
-      // Handbook boxes (font sizes, CTAs, images) aren't tied to one brand check; they all feed "Mobile-ready".
-      const loose = !id && e.target.closest(".pv-mark");
-      if (loose) { showMarkNote(loose); return; }
-      if (!id) {
-        let best = null, bestD = Infinity;
-        for (const el of $$(".pv-mark[data-item]", pg)) {
-          const r = el.getBoundingClientRect();
-          if (!r.width) continue;   // hidden by a legend toggle
-          const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
-          const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
-          const dist = Math.hypot(dx, dy * 1.5) + (r.width * r.height) / 1e6;   // smaller box wins a tie
-          if (dist < bestD) { bestD = dist; best = el; }
-        }
-        id = best && best.dataset.item;
+      const pv = $("#preview");
+      const rowOf = (id) => id && $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
+      const marks = document.elementsFromPoint(e.clientX, e.clientY).filter((el) => el.classList.contains("pv-mark"));
+      const area = (el) => { const r = el.getBoundingClientRect(); return r.width * r.height; };
+      // 1. A box tied to a check (smallest one under the click) → that check, exactly.
+      const linked = marks.filter((el) => el.dataset.item && rowOf(el.dataset.item)).sort((x, z) => area(x) - area(z))[0];
+      let id = linked && linked.dataset.item;
+      // 2. A detected image/headline → the check that is about that thing, if there is one.
+      const loose = marks.find((el) => !el.dataset.item);
+      if (!id && loose && !loose.classList.contains("ai")) {
+        id = ["logo-registered", "dll-colour", "indian-imagery", "benefits", "icons-not-boxes", "header-grammar"]
+          .find((k) => rowOf(k) && artworkMarks(k, pv).includes(loose));
       }
-      const row = id && $(`#checklist .cl-row[data-item="${CSS.escape(id)}"]`);
-      if (!row) { toast("No checklist item for this spot.", "err"); return; }
-      S.focusItem = id;
-      applyFocus(false);
-      row.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (id) {
+        S.focusItem = id;
+        applyFocus(false);
+        rowOf(id).scrollIntoView({ behavior: "smooth", block: "center" });
+      } else if (loose) showMarkNote(loose);   // no check of its own: show what the box says
+      else toast("Nothing is checked at this spot.");
       return;
     }
     const nm = e.target.closest("#checklist .cl-name");
