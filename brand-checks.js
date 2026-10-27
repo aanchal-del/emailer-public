@@ -293,6 +293,7 @@ window.BrandChecks = (() => {
     const split = find(/American[®\s^\d]*\n\s*Express/gi);
     for (const m of split) markAt(m.index, 8, "fail", "“American Express” split across lines");
     const amexAll = find(/American\s+Express/gi);
+    if (!split.length) for (const m of amexAll.slice(0, 12)) markAt(m.index, m[0].length, "pass", "“American Express” on one line");
     if (split.length) set("amex-not-split", "fail", `“American Express” breaks across a line ${split.length} time(s).`);
     else set("amex-not-split", amexAll.length ? "pass" : "review", amexAll.length ? `${amexAll.length} mention(s), none split.` : (hasText ? "No “American Express” in live text — the logo/brand may be an image." : noText));
 
