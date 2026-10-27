@@ -415,12 +415,27 @@
     const briefs = briefsFor(m);
     if (!briefs.length) return [];
     const ai = Object.fromEntries(((ver.briefAI && ver.briefAI.results) || []).map((x) => [x.id, x]));
-    return B.checkAll(briefs, a.brand.text).map((x) => {
+    const rows = B.checkAll(briefs, a.brand.text).map((x) => {
       const r = ai[x.req.id];
       const status = r && x.status !== "superseded" ? r.status : x.status;
       return { id: "brief:" + x.req.id, req: x.req, brief: x.brief, priority: x.priority, status,
                note: r ? r.note : x.note, evidence: x.evidence, method: r ? "ai" : "auto", suggested: BRIEF_SUGGEST[status] || null };
     });
+    // The same requirement written in several briefs is one check: keep the live, newest (P1) copy.
+    const norm = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const groups = new Map();
+    for (const row of rows) {
+      const key = row.req.kind + "|" + norm(row.req.text);
+      (groups.get(key) || groups.set(key, []).get(key)).push(row);
+    }
+    const keep = new Set();
+    for (const g of groups.values()) {
+      const live = g.filter((x) => x.status !== "superseded");
+      const best = (live.length ? live : g).slice().sort((x, z) => x.priority - z.priority)[0];
+      best.also = g.filter((x) => x !== best).map((x) => x.brief.title).filter((t, i, s) => t !== best.brief.title && s.indexOf(t) === i);
+      keep.add(best);
+    }
+    return rows.filter((x) => keep.has(x));
   }
   function briefMarks(rows, brand) {
     const kind = { found: "pass", partial: "warn", conflict: "fail", verify: "info" };
@@ -637,7 +652,7 @@
     });
     const brief = bRows.map((r) => {
       const [cls, word] = BRIEF_BADGE[r.status] || ["review", r.status];
-      return { id: r.id, title: r.req.text, sub: `<span class="prio ${r.priority === 1 ? "top" : ""}">P${r.priority}</span>${esc(r.brief.title)} · ${esc(r.req.kind)}`,
+      return { id: r.id, title: r.req.text, sub: `<span class="prio ${r.priority === 1 ? "top" : ""}">P${r.priority}</span>${esc(r.brief.title)}${r.also && r.also.length ? ` +${r.also.length} more` : ""} · ${esc(r.req.kind)}`,
                cls, word, evidence: r.note, quote: r.status !== "superseded" ? r.evidence : "", replaced: r.status === "superseded", ...place(r.id) };
     });
     // Rows a newer brief added since this draft started get their automatic suggestion.
@@ -721,6 +736,7 @@
     if (!pv) return;
     $$("#checklist .cl-row.focus").forEach((x) => x.classList.remove("focus"));
     $$(".pv-mark.focus", pv).forEach((el) => el.classList.remove("focus"));
+    $$(".pv-page.whole", pv).forEach((el) => el.classList.remove("whole"));
     const old = $("#pvFocus");
     if (old) old.remove();
     pv.classList.toggle("focusing", !!id);
@@ -729,16 +745,36 @@
     if (row) row.classList.add("focus");
     const hits = $$(".pv-mark", pv).filter((el) => el.dataset.item === id);
     hits.forEach((el) => el.classList.add("focus"));
+    // A check judged from the whole mailer has no spot to show: frame every page instead of dimming them all.
+    if (!hits.length) {
+      pv.classList.remove("focusing");
+      $$(".pv-page", pv).forEach((el) => el.classList.add("whole"));
+      if (scroll) { const side = pv.closest(".pv-side"); if (side) side.scrollTo({ top: 0, behavior: "smooth" }); }
+    }
     const isBrief = id.startsWith("brief:");
     const label = (row && $(".cl-title", row) || {}).textContent || C.label(id);
     const none = isBrief ? "not found on the preview — the mailer doesn't seem to contain it"
-      : "judged from the whole mailer or from artwork, so there's no single spot to show";
+      : "judged from the whole mailer, so the whole preview is outlined";
     const bar = document.createElement("div");
     bar.id = "pvFocus";
     bar.className = "pv-focus";
     bar.innerHTML = `<span><b>${esc(label)}</b> — ${hits.length ? `${hits.length} spot(s) on the preview` : none}</span><button type="button" data-act="clear-focus">${icon("x")}Show all</button>`;
     $(".pv-legend", pv).before(bar);
     if (scroll && hits.length) hits[0].scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /* A box with no checklist row of its own (handbook measurement, AI vision): show its own message. */
+  function showMarkNote(mk) {
+    const pv = $("#preview");
+    S.focusItem = null;
+    applyFocus(false);
+    pv.classList.add("focusing");
+    mk.classList.add("focus");
+    const bar = document.createElement("div");
+    bar.id = "pvFocus";
+    bar.className = "pv-focus";
+    bar.innerHTML = `<span><b>${esc(mk.title || ($(".pv-tag", mk) || {}).textContent || "This spot")}</b></span><button type="button" data-act="clear-focus">${icon("x")}Show all</button>`;
+    $(".pv-legend", pv).before(bar);
   }
 
   function knownPeople() {
@@ -1305,7 +1341,8 @@
       const own = e.target.closest(".pv-mark[data-item]");
       let id = own && own.dataset.item;
       // Handbook boxes (font sizes, CTAs, images) aren't tied to one brand check; they all feed "Mobile-ready".
-      if (!id && e.target.closest(".pv-mark:not(.ai)")) id = "mobile";
+      const loose = !id && e.target.closest(".pv-mark");
+      if (loose) { showMarkNote(loose); return; }
       if (!id) {
         let best = null, bestD = Infinity;
         for (const el of $$(".pv-mark[data-item]", pg)) {

@@ -534,3 +534,5 @@ details.checklist:not([open]) { padding-bottom: 16px; }
 .side-proj .side-title { margin: 8px 0 12px; }
 .side-proj .side-title h2 { margin: 0; }
 .pv-mark, .pv-page { cursor: pointer; }
+
+.preview .pv-page.whole { outline: 3px solid var(--amex-blue); outline-offset: -3px; box-shadow: 0 0 0 4px rgba(0,111,207,.25); }
